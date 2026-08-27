@@ -1,7 +1,8 @@
 import { BoundingBox, PlateCandidate } from './types';
 
 /**
- * Creates an in-memory canvas from an image, video, or existing canvas
+ * Creates an in-memory canvas from an image, video, or existing canvas,
+ * preserving full original HD/4K natural resolution (never downscaling to CSS preview size)
  */
 export function createCanvasFromSource(
   source: HTMLImageElement | HTMLVideoElement | HTMLCanvasElement,
@@ -9,31 +10,47 @@ export function createCanvasFromSource(
   targetHeight?: number
 ): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
-  const width = targetWidth || (source instanceof HTMLVideoElement ? source.videoWidth : source.width);
-  const height = targetHeight || (source instanceof HTMLVideoElement ? source.videoHeight : source.height);
+  let width = targetWidth;
+  let height = targetHeight;
+
+  if (!width || !height) {
+    if (source instanceof HTMLVideoElement) {
+      width = source.videoWidth || source.width || 1280;
+      height = source.videoHeight || source.height || 720;
+    } else if (source instanceof HTMLImageElement) {
+      // CRITICAL: use naturalWidth / naturalHeight so full HD resolution is preserved!
+      width = source.naturalWidth || source.width || 1920;
+      height = source.naturalHeight || source.height || 1080;
+    } else {
+      width = source.width || 1280;
+      height = source.height || 720;
+    }
+  }
 
   canvas.width = Math.max(1, width);
   canvas.height = Math.max(1, height);
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (ctx) {
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
   }
   return canvas;
 }
 
 /**
- * High-definition plate crop with generous safety padding and preserving native HD resolution
+ * High-definition plate crop with tight padding and preserving native HD resolution
  */
 export function cropCanvas(
   sourceCanvas: HTMLCanvasElement,
   bbox: BoundingBox,
-  targetHeight: number = 200
+  targetHeight: number = 240
 ): HTMLCanvasElement {
   const cropCanvas = document.createElement('canvas');
   
-  // 12% horizontal and 15% vertical padding to ensure edge letters (e.g. 'A', 'Q', 'DK') are never clipped
-  const padX = Math.round(bbox.width * 0.12);
-  const padY = Math.round(bbox.height * 0.15);
+  // 6% horizontal and 8% vertical padding (clean, tight padding so we don't grab excess car bumper/paint)
+  const padX = Math.round(bbox.width * 0.06);
+  const padY = Math.round(bbox.height * 0.08);
 
   const startX = Math.max(0, bbox.x - padX);
   const startY = Math.max(0, bbox.y - padY);
@@ -41,8 +58,8 @@ export function cropCanvas(
   const cropH = Math.min(sourceCanvas.height - startY, bbox.height + padY * 2);
 
   const aspect = cropW / Math.max(1, cropH);
-  // Maintain native HD resolution if the original crop is already high-res, otherwise upscale to crisp 200px
-  const finalH = Math.max(cropH, targetHeight);
+  // Upscale crop to high-resolution (height at least 240px, width proportional)
+  const finalH = Math.max(cropH, targetHeight, 240);
   const finalW = Math.round(finalH * aspect);
 
   cropCanvas.width = finalW;
@@ -55,7 +72,7 @@ export function cropCanvas(
     ctx.drawImage(sourceCanvas, startX, startY, cropW, cropH, 0, 0, finalW, finalH);
   }
 
-  // Apply gentle unsharp mask to crisp up blurry edges
+  // Apply unsharp mask to crisp up blurry edges
   return applySharpenFilter(cropCanvas);
 }
 
@@ -360,7 +377,9 @@ export function locatePlateCandidates(
     const bh = size.h;
     if (bw >= sW || bh >= sH || bw < 16 || bh < 10) continue;
 
-    for (let y = Math.round(sH * 0.08); y < sH - bh - 2; y += stepY) {
+    // Avoid the very bottom road/asphalt edge unless the image is a tight crop
+    const maxScanY = Math.round(sH * 0.86) - bh;
+    for (let y = Math.round(sH * 0.06); y <= maxScanY; y += stepY) {
       for (let x = 2; x < sW - bw - 2; x += stepX) {
         let edgeCount = 0;
         const total = bw * bh;
@@ -374,9 +393,10 @@ export function locatePlateCandidates(
         }
 
         const density = edgeCount / total;
-        if (density > 0.14 && density < 0.88) {
+        // True license plates have balanced character density (0.16 to 0.75), whereas uniform asphalt is speckled noise
+        if (density > 0.16 && density < 0.75) {
           const verticalWeight = (y + bh / 2) / sH;
-          const score = density * 100 * (0.8 + 0.4 * verticalWeight);
+          const score = density * 100 * (0.85 + 0.35 * verticalWeight);
           scoredBoxes.push({ x, y, w: bw, h: bh, score, vType: size.vType });
         }
       }
@@ -416,7 +436,7 @@ export function locatePlateCandidates(
       height: Math.min(height, Math.round(box.h / searchScale)),
     };
 
-    const cropped = cropCanvas(sourceCanvas, origBbox, 150);
+    const cropped = cropCanvas(sourceCanvas, origBbox, 240);
     const enhanced = enhancePlateForOcr(cropped);
 
     candidates.push({
@@ -430,11 +450,11 @@ export function locatePlateCandidates(
     });
   }
 
-  // Always include full image candidate if it is already a single cropped plate
-  const isDirectPlateCrop = width / height >= 1.3 && width / height <= 5.5;
-  if (isDirectPlateCrop || candidates.length === 0) {
+  // Only include full image candidate if the uploaded file is ALREADY a tight close-up plate crop
+  const isDirectPlateCrop = width / height >= 1.8 && width / height <= 4.8 && width <= 900 && height <= 350;
+  if (isDirectPlateCrop) {
     const fullBbox: BoundingBox = { x: 0, y: 0, width, height };
-    const cropped = cropCanvas(sourceCanvas, fullBbox, 150);
+    const cropped = cropCanvas(sourceCanvas, fullBbox, 240);
     const enhanced = enhancePlateForOcr(cropped);
     candidates.unshift({
       bbox: fullBbox,

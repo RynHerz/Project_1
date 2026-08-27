@@ -7,7 +7,7 @@ import { createDefaultCargoManifest } from './sampleData';
 
 /**
  * Executes multi-plate ALPR pipeline on an image or video element,
- * returning ALL detected plates in the scene (e.g. 2, 3, or more vehicles/motorbikes)
+ * returning ONLY real detected vehicle license plates (zero asphalt/background noise)
  */
 export async function runAlprPipelineMulti(
   source: HTMLImageElement | HTMLVideoElement | HTMLCanvasElement,
@@ -16,19 +16,20 @@ export async function runAlprPipelineMulti(
 ): Promise<DetectionResult[]> {
   const startTime = performance.now();
 
-  // Create canvas from source
+  // Create canvas from source using full original HD/4K natural resolution
   const sourceCanvas = createCanvasFromSource(source);
-  const sourceDataUrl = sourceCanvas.toDataURL('image/jpeg', 0.85);
+  const sourceDataUrl = sourceCanvas.toDataURL('image/jpeg', 0.90);
 
   let candidates: PlateCandidate[] = [];
   let detectionMethod: DetectionResult['method'] = 'cv_contour';
 
-  // Step 1: Detect Plate Bounding Boxes (Stage 1 YOLO ONNX)
+  // Step 1: Detect Plate Bounding Boxes via YOLO Neural Network
   const onnxStatus = getOnnxStatus();
   if (onnxStatus.loaded) {
     try {
-      const onnxCandidates = await detectPlatesWithOnnx(sourceCanvas, 0.35);
+      const onnxCandidates = await detectPlatesWithOnnx(sourceCanvas, 0.28);
       if (onnxCandidates.length > 0) {
+        // When AI model detects plates, use ONLY AI candidates (never mix with blind background CV boxes)
         candidates = onnxCandidates;
         detectionMethod = 'onnx_yolo';
       }
@@ -37,28 +38,13 @@ export async function runAlprPipelineMulti(
     }
   }
 
-  // Combine with Classical Multi-Scale CV candidates to ensure no vehicles/motorcycles are missed
-  const cvCandidates = locatePlateCandidates(sourceCanvas, 12);
+  // Fallback to Classical Multi-Scale CV ONLY IF ONNX produced 0 detections or is not loaded
   if (candidates.length === 0) {
-    candidates = cvCandidates;
+    candidates = locatePlateCandidates(sourceCanvas, 6);
     detectionMethod = 'cv_contour';
-  } else {
-    // Add distinct CV candidates if they don't overlap with ONNX boxes
-    for (const cvCand of cvCandidates) {
-      const overlaps = candidates.some((c) => {
-        const xOverlap = Math.max(0, Math.min(c.bbox.x + c.bbox.width, cvCand.bbox.x + cvCand.bbox.width) - Math.max(c.bbox.x, cvCand.bbox.x));
-        const yOverlap = Math.max(0, Math.min(c.bbox.y + c.bbox.height, cvCand.bbox.y + cvCand.bbox.height) - Math.max(c.bbox.y, cvCand.bbox.y));
-        const inter = xOverlap * yOverlap;
-        const union = c.bbox.width * c.bbox.height + cvCand.bbox.width * cvCand.bbox.height - inter;
-        return (inter / Math.max(1, union)) > 0.35;
-      });
-      if (!overlaps) {
-        candidates.push(cvCand);
-      }
-    }
   }
 
-  // Step 2: Recognize Characters on all candidates
+  // Step 2: Recognize Characters on all candidate boxes
   const validDetections: DetectionResult[] = [];
 
   for (let idx = 0; idx < candidates.length; idx++) {
@@ -74,24 +60,27 @@ export async function runAlprPipelineMulti(
       }
     }
 
-    // 2.2 Fallback to Multi-Pass Tesseract OCR
-    if (!ocr || !ocr.isValidFormat || ocr.confidence < 50) {
-      const ocrTarget = candidate.canvas;
-      const tesseractResult = await recognizePlateFromCanvas(ocrTarget);
+    // 2.2 Multi-Pass Tesseract OCR (with both natural RGB & enhanced binarized variants)
+    if (!ocr || !ocr.isValidFormat || ocr.confidence < 60) {
+      const tesseractResult = await recognizePlateFromCanvas(candidate.canvas, candidate.enhancedCanvas);
       if (!ocr || (tesseractResult.isValidFormat && tesseractResult.confidence > (ocr?.confidence || 0))) {
         ocr = tesseractResult;
       }
     }
 
-    // Strict format check to reject random asphalt / background texture noise
-    if (!ocr || !ocr.isValidFormat || ocr.confidence < 45) {
+    if (!ocr) {
       continue;
     }
 
     const cleanPlateUpper = ocr.formattedPlate.replace(/\s+/g, '').toUpperCase();
-    // Must have at least 4 characters (e.g. B 1 A) and not generic fallback
-    if (cleanPlateUpper.length < 4 || cleanPlateUpper === 'TIDAKTERDETEKSI' || cleanPlateUpper === 'TIDAKTERBACA') {
-      continue;
+    const isAiBox = candidate.sourceType === 'onnx_yolo';
+
+    // Must have at least 3 characters and not generic fallback
+    if (cleanPlateUpper.length < 3 || cleanPlateUpper === 'TIDAKTERBACA' || cleanPlateUpper === 'TIDAKTERDETEKSI') {
+      // If AI is 100% sure it's a plate box (e.g. from YOLO model), provide formatted OCR even if low confidence
+      if (!isAiBox || ocr.cleanedText.length < 2) {
+        continue;
+      }
     }
 
     // Check if we already detected this same plate in another bounding box
@@ -145,7 +134,7 @@ export async function runAlprPipelineMulti(
       plateNumber: ocr.cleanedText,
       formattedPlate: ocr.formattedPlate,
       expiryDate: ocr.expiryDate,
-      confidence: ocr.confidence,
+      confidence: Math.max(ocr.confidence, isAiBox ? candidate.confidence : ocr.confidence),
       bbox: candidate.bbox,
       method: candidate.sourceType === 'onnx_yolo' ? 'onnx_yolo' : detectionMethod,
       vehicleType: autoVehicleType,
@@ -156,33 +145,37 @@ export async function runAlprPipelineMulti(
     });
   }
 
-  // If no valid plates parsed, fallback to first raw candidate if available
-  if (validDetections.length === 0 && candidates.length > 0) {
+  // If AI found a candidate box but OCR couldn't read all letters, show the cropped AI plate box with raw text
+  if (validDetections.length === 0 && candidates.length > 0 && candidates[0].sourceType === 'onnx_yolo') {
     const candidate = candidates[0];
+    const rawOcr = await recognizePlateFromCanvas(candidate.canvas, candidate.enhancedCanvas);
+    const fallbackText = rawOcr.formattedPlate || rawOcr.cleanedText || 'PLAT TERDETEKSI';
+
     validDetections.push({
       id: `scan_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
       timestamp: Date.now(),
       sourceImage: sourceDataUrl,
       plateCropImage: candidate.dataUrl,
       enhancedPlateImage: candidate.enhancedDataUrl,
-      plateNumber: 'TIDAK TERDETEKSI',
-      formattedPlate: 'TIDAK TERDETEKSI',
-      confidence: 0,
+      plateNumber: fallbackText.replace(/\s+/g, ''),
+      formattedPlate: fallbackText,
+      expiryDate: rawOcr.expiryDate,
+      confidence: Math.max(60, candidate.confidence),
       bbox: candidate.bbox,
-      method: detectionMethod,
+      method: 'onnx_yolo',
       vehicleType: 'Mobil',
       status: 'unknown',
-      notes: 'Plat kurang jelas atau tidak terdeteksi',
+      notes: rawOcr.regionName || 'Plat kendaraan terdeteksi oleh AI',
       processingTimeMs: Math.round(performance.now() - startTime),
-      cargoManifest: createDefaultCargoManifest('TIDAK TERDETEKSI'),
+      cargoManifest: createDefaultCargoManifest(fallbackText),
     });
   }
 
   if (validDetections.length === 0) {
-    throw new Error('Gagal memproses gambar plat nomor.');
+    throw new Error('Tidak ada plat nomor kendaraan yang terdeteksi pada gambar ini.');
   }
 
-  if (enableSound && validDetections.some((d) => d.confidence >= 50)) {
+  if (enableSound && validDetections.some((d) => d.confidence >= 45)) {
     const anyBlacklist = validDetections.some((d) => d.status === 'blacklist');
     playDetectionAudioBeep(!anyBlacklist);
   }

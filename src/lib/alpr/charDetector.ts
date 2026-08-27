@@ -15,33 +15,45 @@ const ROBFLOW_CHAR_MAPPING: Record<number, string> = {
 };
 
 export async function loadCharDetector(modelSource: string | ArrayBuffer = '/models/char_detector.onnx'): Promise<ort.InferenceSession> {
-  if (charSession && typeof modelSource === 'string' && modelSource === '/models/char_detector.onnx') {
+  if (charSession) {
     return charSession;
   }
 
   isCharLoading = true;
   charLoadError = null;
 
-  try {
-    const sessionOptions: ort.InferenceSession.SessionOptions = {
-      executionProviders: ['wasm'],
-      graphOptimizationLevel: 'all',
-    };
+  const sessionOptions: ort.InferenceSession.SessionOptions = {
+    executionProviders: ['wasm'],
+    graphOptimizationLevel: 'all',
+  };
 
-    const session =
-      typeof modelSource === 'string'
-        ? await ort.InferenceSession.create(modelSource, sessionOptions)
-        : await ort.InferenceSession.create(new Uint8Array(modelSource), sessionOptions);
+  const candidateUrls =
+    typeof modelSource === 'string'
+      ? [modelSource, '/models/char_best.onnx', '/models/char_detector.onnx']
+      : [modelSource];
 
-    charSession = session;
-    isCharLoading = false;
-    return session;
-  } catch (err: any) {
-    isCharLoading = false;
-    charLoadError = err?.message || 'Gagal memuat model karakter ONNX';
-    console.warn('Char Detector load notice:', charLoadError);
-    throw err;
+  let lastError: any = null;
+
+  for (const url of candidateUrls) {
+    try {
+      const session =
+        typeof url === 'string'
+          ? await ort.InferenceSession.create(url, sessionOptions)
+          : await ort.InferenceSession.create(new Uint8Array(url), sessionOptions);
+
+      charSession = session;
+      isCharLoading = false;
+      console.log('✅ Berhasil memuat model karakter ONNX:', url);
+      return session;
+    } catch (err) {
+      lastError = err;
+    }
   }
+
+  isCharLoading = false;
+  charLoadError = lastError?.message || 'Gagal memuat model karakter ONNX';
+  console.warn('Char Detector load notice:', charLoadError);
+  throw lastError || new Error(charLoadError!);
 }
 
 export function isCharDetectorLoaded(): boolean {

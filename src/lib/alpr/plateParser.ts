@@ -47,8 +47,8 @@ export const VALID_INDONESIA_PREFIXES = new Set([
 export function cleanOcrText(rawText: string): string {
   if (!rawText) return '';
   let text = rawText.toUpperCase().replace(/[\r\n\t]+/g, ' ');
-  // Parens and brackets are often the letter 'D' or 'I' cut off at the edge of plates
-  text = text.replace(/\)/g, 'D').replace(/\(/g, 'D').replace(/\]/g, 'I').replace(/\[/g, 'I');
+  // Strip frame brackets, pipes, quotes, and punctuation noise from edges
+  text = text.replace(/[\[\]\(\)\{\}\|_~"'\\]/g, ' ');
   text = text.replace(/[^A-Z0-9\s.\-]/g, ' ');
   return text.replace(/\s+/g, ' ').trim();
 }

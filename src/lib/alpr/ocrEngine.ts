@@ -1,7 +1,7 @@
 import { createWorker, Worker } from 'tesseract.js';
 import { OcrResult } from './types';
 import { parseIndonesianPlate } from './plateParser';
-import { cropTopLineRoi } from './platePreprocessor';
+import { cropTopLineRoi, enhancePlateForOcr } from './platePreprocessor';
 
 let ocrWorker: Worker | null = null;
 let isInitializing = false;
@@ -42,15 +42,22 @@ export async function getOcrWorker(): Promise<Worker> {
 }
 
 /**
- * Runs OCR on multiple variations of the canvas and picks the most accurate Indonesian plate reading
+ * Runs OCR on multiple variations of the canvas (including Adaptive Binarized black-on-white)
+ * and picks the most accurate Indonesian plate reading
  */
-export async function recognizePlateFromCanvas(canvas: HTMLCanvasElement): Promise<OcrResult> {
+export async function recognizePlateFromCanvas(canvas: HTMLCanvasElement, enhancedCanvas?: HTMLCanvasElement): Promise<OcrResult> {
   const worker = await getOcrWorker();
 
-  // Multi-pass variants
+  const binarized = enhancedCanvas || enhancePlateForOcr(canvas);
+  const topLineBinarized = cropTopLineRoi(binarized);
+  const topLineOriginal = cropTopLineRoi(canvas);
+
+  // Multi-pass variants: Testing enhanced binarized first (optimal for black & white Indonesian plates)
   const variants: { name: string; canvas: HTMLCanvasElement }[] = [
+    { name: 'enhanced_binarized', canvas: binarized },
+    { name: 'enhanced_top_main_line', canvas: topLineBinarized },
     { name: 'original_natural', canvas },
-    { name: 'top_main_line', canvas: cropTopLineRoi(canvas) },
+    { name: 'top_main_line', canvas: topLineOriginal },
   ];
 
   const results: OcrResult[] = [];
@@ -65,7 +72,7 @@ export async function recognizePlateFromCanvas(canvas: HTMLCanvasElement): Promi
         const parsed = parseIndonesianPlate(rawText, rawConf);
         results.push(parsed);
 
-        // If we found a valid plate format (e.g. DK 1234 XX), return immediately
+        // If we found a valid plate format (e.g. DB 1392 BV or B 1234 ABC), return immediately
         if (parsed.isValidFormat && parsed.regionCode) {
           return parsed;
         }
