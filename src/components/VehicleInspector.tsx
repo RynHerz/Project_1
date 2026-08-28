@@ -17,6 +17,7 @@ import {
 import { DetectionResult, WhitelistRule, VehicleCargoManifest } from '../lib/alpr/types';
 import { runAlprPipelineMulti } from '../lib/alpr/pipeline';
 import { VehicleCargoForm } from './VehicleCargoForm';
+import { PlateCameraFrame, PlateCaptureResult } from './PlateCameraFrame';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,6 +44,7 @@ export const VehicleInspector: React.FC<VehicleInspectorProps> = ({
   const [detectedResults, setDetectedResults] = useState<DetectionResult[]>([]);
   const [selectedVehicleIndex, setSelectedVehicleIndex] = useState<number>(0);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [isCameraOpen, setIsCameraOpen] = useState<boolean>(false);
 
   // Manual plate editing state
   const [isEditingPlate, setIsEditingPlate] = useState<boolean>(false);
@@ -238,19 +240,19 @@ export const VehicleInspector: React.FC<VehicleInspectorProps> = ({
         {/* Action Buttons */}
         <div className="flex items-center gap-2">
           <Button
-            onClick={() => cameraCaptureInputRef.current?.click()}
+            onClick={() => setIsCameraOpen(true)}
             size="sm"
-            className="gap-2 text-xs font-semibold"
+            className="gap-2 text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-zinc-950 shadow-md cursor-pointer border-0"
           >
             <Camera className="w-3.5 h-3.5" />
-            <span>Foto Kamera</span>
+            <span>Kamera Plat (Live Frame)</span>
           </Button>
 
           <Button
             variant="outline"
             size="sm"
             onClick={() => fileInputRef.current?.click()}
-            className="gap-2 text-xs font-medium"
+            className="gap-2 text-xs font-medium cursor-pointer"
           >
             <Upload className="w-3.5 h-3.5" />
             <span>Upload Foto</span>
@@ -322,15 +324,25 @@ export const VehicleInspector: React.FC<VehicleInspectorProps> = ({
                   )}
 
                   {/* Media Control Toolbar */}
-                  <div className="mt-3 w-full flex items-center justify-between gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="text-xs gap-1.5 h-8"
-                    >
-                      <Upload className="w-3 h-3" /> Ganti Gambar
-                    </Button>
+                  <div className="mt-3 w-full flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsCameraOpen(true)}
+                        className="text-xs gap-1.5 h-8 border-amber-500/40 text-amber-400 hover:bg-amber-500/10 cursor-pointer"
+                      >
+                        <Camera className="w-3 h-3" /> Kamera Baru
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="text-xs gap-1.5 h-8 cursor-pointer"
+                      >
+                        <Upload className="w-3 h-3" /> Ganti Gambar
+                      </Button>
+                    </div>
 
                     {selectedFileType === 'image' && (
                       <Button
@@ -338,7 +350,7 @@ export const VehicleInspector: React.FC<VehicleInspectorProps> = ({
                         size="sm"
                         onClick={processImage}
                         disabled={isProcessing}
-                        className="text-xs gap-1.5 h-8"
+                        className="text-xs gap-1.5 h-8 cursor-pointer"
                       >
                         <RefreshCw className={`w-3 h-3 ${isProcessing ? 'animate-spin' : ''}`} />
                         Pindai Ulang
@@ -347,22 +359,31 @@ export const VehicleInspector: React.FC<VehicleInspectorProps> = ({
                   </div>
                 </div>
               ) : (
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full border-2 border-dashed border-border hover:border-primary/50 rounded-lg p-8 text-center cursor-pointer transition bg-muted/20 hover:bg-muted/40"
-                >
-                  <div className="w-12 h-12 rounded-lg bg-muted border border-border flex items-center justify-center mx-auto mb-3 text-muted-foreground">
-                    <Upload className="w-6 h-6" />
+                <div className="w-full border-2 border-dashed border-border hover:border-amber-500/40 rounded-xl p-6 sm:p-8 text-center transition bg-muted/15 flex flex-col items-center justify-center">
+                  <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto mb-3.5 text-amber-400 shadow-inner">
+                    <Camera className="w-7 h-7" />
                   </div>
-                  <h3 className="text-sm font-semibold text-foreground mb-1">
-                    Upload Foto / Video Kendaraan
+                  <h3 className="text-sm font-semibold text-foreground mb-1.5">
+                    Pindai & Inspeksi Plat Kendaraan
                   </h3>
-                  <p className="text-xs text-muted-foreground max-w-xs mx-auto mb-4">
-                    Mendukung deteksi tunggal maupun multi-kendaraan dalam satu tangkapan gambar.
+                  <p className="text-xs text-muted-foreground max-w-xs mx-auto mb-5 leading-relaxed">
+                    Buka kamera langsung dengan bingkai pemandu plat 3.5:1 atau unggah foto/video dari galeri perangkat.
                   </p>
-                  <div className="flex items-center justify-center gap-2">
-                    <Button size="sm" variant="secondary" className="gap-1.5 text-xs pointer-events-none">
-                      <ImageIcon className="w-3.5 h-3.5" /> Pilih File
+                  <div className="flex flex-wrap items-center justify-center gap-2.5">
+                    <Button
+                      size="sm"
+                      onClick={() => setIsCameraOpen(true)}
+                      className="gap-2 text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-zinc-950 shadow-md cursor-pointer px-4 py-2 border-0"
+                    >
+                      <Camera className="w-4 h-4" /> Buka Kamera Plat
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="gap-2 text-xs border-border hover:bg-muted cursor-pointer"
+                    >
+                      <Upload className="w-4 h-4" /> Pilih dari Galeri
                     </Button>
                   </div>
                 </div>
@@ -573,6 +594,24 @@ export const VehicleInspector: React.FC<VehicleInspectorProps> = ({
           )}
         </div>
       </div>
+
+      {/* Live Plate Detection Camera Frame Modal */}
+      {isCameraOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-2xl">
+            <PlateCameraFrame
+              onConfirm={(captured: PlateCaptureResult) => {
+                setFileUrl(captured.fullDataUrl || captured.croppedDataUrl);
+                setSelectedFileType('image');
+                setDetectedResults([]);
+                setSelectedVehicleIndex(0);
+                setIsCameraOpen(false);
+              }}
+              onCancel={() => setIsCameraOpen(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
