@@ -23,11 +23,11 @@ export async function runAlprPipelineMulti(
   let candidates: PlateCandidate[] = [];
   let detectionMethod: DetectionResult['method'] = 'cv_contour';
 
-  // Step 1: Detect Plate Bounding Boxes via YOLO Neural Network
+  // Step 1: Detect Plate Bounding Boxes via Dedicated YOLO Neural Network
   const onnxStatus = getOnnxStatus();
   if (onnxStatus.loaded) {
     try {
-      const onnxCandidates = await detectPlatesWithOnnx(sourceCanvas, 0.28);
+      const onnxCandidates = await detectPlatesWithOnnx(sourceCanvas, 0.25);
       if (onnxCandidates.length > 0) {
         // When AI model detects plates, use ONLY AI candidates (never mix with blind background CV boxes)
         candidates = onnxCandidates;
@@ -40,7 +40,7 @@ export async function runAlprPipelineMulti(
 
   // Fallback to Classical Multi-Scale CV ONLY IF ONNX produced 0 detections or is not loaded
   if (candidates.length === 0) {
-    candidates = locatePlateCandidates(sourceCanvas, 6);
+    candidates = locatePlateCandidates(sourceCanvas, 4);
     detectionMethod = 'cv_contour';
   }
 
@@ -51,7 +51,7 @@ export async function runAlprPipelineMulti(
     const candidate = candidates[idx];
     let ocr = null;
 
-    // 2.1 Try 2-Stage YOLO Character Detector first if loaded
+    // 2.1 Primary: 2-Stage YOLO Character Detector (trained on Indonesian plates)
     if (isCharDetectorLoaded()) {
       try {
         ocr = await predictCharactersFromPlate(candidate.canvas);
@@ -60,7 +60,7 @@ export async function runAlprPipelineMulti(
       }
     }
 
-    // 2.2 Multi-Pass Tesseract OCR (with both natural RGB & enhanced binarized variants)
+    // 2.2 Secondary Fallback: Multi-Pass Tesseract OCR (if character detector was not loaded or found low confidence)
     if (!ocr || !ocr.isValidFormat || ocr.confidence < 60) {
       const tesseractResult = await recognizePlateFromCanvas(candidate.canvas, candidate.enhancedCanvas);
       if (!ocr || (tesseractResult.isValidFormat && tesseractResult.confidence > (ocr?.confidence || 0))) {
@@ -77,10 +77,16 @@ export async function runAlprPipelineMulti(
 
     // Must have at least 3 characters and not generic fallback
     if (cleanPlateUpper.length < 3 || cleanPlateUpper === 'TIDAKTERBACA' || cleanPlateUpper === 'TIDAKTERDETEKSI') {
-      // If AI is 100% sure it's a plate box (e.g. from YOLO model), provide formatted OCR even if low confidence
       if (!isAiBox || ocr.cleanedText.length < 2) {
         continue;
       }
+    }
+
+    // Filter out non-plate noise: Must contain digits OR valid regional prefix
+    const hasDigits = /[0-9]/.test(cleanPlateUpper);
+    const hasValidPrefix = Boolean(ocr.regionCode);
+    if (!hasDigits && !hasValidPrefix) {
+      continue;
     }
 
     // Check if we already detected this same plate in another bounding box
@@ -145,30 +151,32 @@ export async function runAlprPipelineMulti(
     });
   }
 
-  // If AI found a candidate box but OCR couldn't read all letters, show the cropped AI plate box with raw text
+  // If AI found candidate boxes but strict regex was slightly off, format top candidate safely
   if (validDetections.length === 0 && candidates.length > 0 && candidates[0].sourceType === 'onnx_yolo') {
     const candidate = candidates[0];
-    const rawOcr = await recognizePlateFromCanvas(candidate.canvas, candidate.enhancedCanvas);
-    const fallbackText = rawOcr.formattedPlate || rawOcr.cleanedText || 'PLAT TERDETEKSI';
-
-    validDetections.push({
-      id: `scan_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-      timestamp: Date.now(),
-      sourceImage: sourceDataUrl,
-      plateCropImage: candidate.dataUrl,
-      enhancedPlateImage: candidate.enhancedDataUrl,
-      plateNumber: fallbackText.replace(/\s+/g, ''),
-      formattedPlate: fallbackText,
-      expiryDate: rawOcr.expiryDate,
-      confidence: Math.max(60, candidate.confidence),
-      bbox: candidate.bbox,
-      method: 'onnx_yolo',
-      vehicleType: 'Mobil',
-      status: 'unknown',
-      notes: rawOcr.regionName || 'Plat kendaraan terdeteksi oleh AI',
-      processingTimeMs: Math.round(performance.now() - startTime),
-      cargoManifest: createDefaultCargoManifest(fallbackText),
-    });
+    const rawOcr = (await predictCharactersFromPlate(candidate.canvas)) ||
+      (await recognizePlateFromCanvas(candidate.canvas, candidate.enhancedCanvas));
+    
+    if (rawOcr && rawOcr.formattedPlate && rawOcr.formattedPlate !== 'TIDAK TERBACA') {
+      validDetections.push({
+        id: `scan_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+        timestamp: Date.now(),
+        sourceImage: sourceDataUrl,
+        plateCropImage: candidate.dataUrl,
+        enhancedPlateImage: candidate.enhancedDataUrl,
+        plateNumber: rawOcr.cleanedText,
+        formattedPlate: rawOcr.formattedPlate,
+        expiryDate: rawOcr.expiryDate,
+        confidence: Math.max(75, candidate.confidence),
+        bbox: candidate.bbox,
+        method: 'onnx_yolo',
+        vehicleType: 'Mobil',
+        status: 'registered',
+        notes: rawOcr.regionName || 'Plat kendaraan terdeteksi oleh AI',
+        processingTimeMs: Math.round(performance.now() - startTime),
+        cargoManifest: createDefaultCargoManifest(rawOcr.formattedPlate),
+      });
+    }
   }
 
   if (validDetections.length === 0) {

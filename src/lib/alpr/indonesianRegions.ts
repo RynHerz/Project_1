@@ -14,12 +14,12 @@ export const INDONESIAN_PLATE_REGIONS: Record<string, { name: string; island: st
   'BP': { name: 'Kepulauan Riau (Batam / Tanjungpinang)', island: 'Sumatera' },
   'BG': { name: 'Sumatera Selatan (Palembang)', island: 'Sumatera' },
   'BN': { name: 'Bangka Belitung', island: 'Sumatera' },
-  'BE': { name: 'Lampung (Bandar Lampung)', island: 'Sumatera' },
+  'BE': { name: 'Lampung (Bandar Lampung / Metro)', island: 'Sumatera' },
   'BD': { name: 'Bengkulu', island: 'Sumatera' },
   'BH': { name: 'Jambi', island: 'Sumatera' },
 
-  // Jawa & Jabodetabek
-  'A': { name: 'Banten (Serang / Cilegon / Pandeglang)', island: 'Jawa' },
+  // Jawa Barat & Banten & DKI Jakarta
+  'A': { name: 'Banten (Serang / Cilegon / Pandeglang / Lebak)', island: 'Jawa' },
   'B': { name: 'DKI Jakarta / Depok / Tangerang / Bekasi', island: 'Jawa' },
   'D': { name: 'Bandung / Cimahi', island: 'Jawa' },
   'E': { name: 'Cirebon / Indramayu / Majalengka / Kuningan', island: 'Jawa' },
@@ -34,7 +34,7 @@ export const INDONESIAN_PLATE_REGIONS: Record<string, { name: string; island: st
   'R': { name: 'Banyumas / Purwokerto / Cilacap / Purbalingga / Banjarnegara', island: 'Jawa' },
   'AA': { name: 'Kedu / Magelang / Kebumen / Purworejo / Wonosobo / Temanggung', island: 'Jawa' },
   'AD': { name: 'Surakarta / Solo / Sukoharjo / Boyolali / Klaten / Wonogiri / Sragen', island: 'Jawa' },
-  'AB': { name: 'DI Yogyakarta (Sleman / Bantul / Gunungkidul / Kulon Progo)', island: 'Jawa' },
+  'AB': { name: 'DI Yogyakarta (Kota / Sleman / Bantul / Gunungkidul / Kulon Progo)', island: 'Jawa' },
 
   // Jawa Timur
   'L': { name: 'Surabaya', island: 'Jawa' },
@@ -47,8 +47,8 @@ export const INDONESIAN_PLATE_REGIONS: Record<string, { name: string; island: st
   'AG': { name: 'Kediri / Blitar / Tulungagung / Trenggalek / Nganjuk', island: 'Jawa' },
 
   // Bali & Nusa Tenggara
-  'DK': { name: 'Bali (Denpasar / Badung / Gianyar / Buleleng)', island: 'Bali' },
-  'DR': { name: 'Lombok (Mataram / Lombok Barat / Timur)', island: 'Nusa Tenggara' },
+  'DK': { name: 'Bali (Denpasar / Badung / Gianyar / Tabanan / Buleleng)', island: 'Bali' },
+  'DR': { name: 'Lombok (Mataram / Lombok Barat / Timur / Tengah)', island: 'Nusa Tenggara' },
   'EA': { name: 'Sumbawa / Bima / Dompu', island: 'Nusa Tenggara' },
   'DH': { name: 'Timor / Kupang', island: 'Nusa Tenggara' },
   'EB': { name: 'Flores / Manggarai / Ende / Sikka', island: 'Nusa Tenggara' },
@@ -56,36 +56,34 @@ export const INDONESIAN_PLATE_REGIONS: Record<string, { name: string; island: st
 
   // Kalimantan
   'KB': { name: 'Kalimantan Barat (Pontianak)', island: 'Kalimantan' },
-  'DA': { name: 'Kalimantan Selatan (Banjarmasin)', island: 'Kalimantan' },
+  'DA': { name: 'Kalimantan Selatan (Banjarmasin / Banjarbaru)', island: 'Kalimantan' },
   'KH': { name: 'Kalimantan Tengah (Palangka Raya)', island: 'Kalimantan' },
-  'KT': { name: 'Kalimantan Timur (Balikpapan / Samarinda)', island: 'Kalimantan' },
-  'KU': { name: 'Kalimantan Utara (Tarakan / Tanjung Selor)', island: 'Kalimantan' },
+  'KT': { name: 'Kalimantan Timur (Balikpapan / Samarinda / Bontang)', island: 'Kalimantan' },
+  'KU': { name: 'Kalimantan Utara (Tarakan / Bulungan / Nunukan)', island: 'Kalimantan' },
 
   // Sulawesi
-  'DB': { name: 'Sulawesi Utara (Manado / Bitung / Minahasa)', island: 'Sulawesi' },
-  'DL': { name: 'Kepulauan Sangihe / Talaud', island: 'Sulawesi' },
+  'DB': { name: 'Sulawesi Utara (Manado / Bitung / Minahasa / Tomohon)', island: 'Sulawesi' },
+  'DL': { name: 'Kepulauan Sangihe / Talaud / Siau', island: 'Sulawesi' },
   'DM': { name: 'Gorontalo', island: 'Sulawesi' },
-  'DN': { name: 'Sulawesi Tengah (Palu)', island: 'Sulawesi' },
-  'DP': { name: 'Sulawesi Selatan (Parepare / Palopo)', island: 'Sulawesi' },
-  'DD': { name: 'Sulawesi Selatan (Makassar / Gowa / Maros)', island: 'Sulawesi' },
-  'DC': { name: 'Sulawesi Barat (Mamuju / Majene)', island: 'Sulawesi' },
-  'DT': { name: 'Sulawesi Tenggara (Kendari)', island: 'Sulawesi' },
+  'DN': { name: 'Sulawesi Tengah (Palu / Donggala / Tolitoli)', island: 'Sulawesi' },
+  'DP': { name: 'Sulawesi Selatan (Parepare / Palopo / Barru / Pinrang)', island: 'Sulawesi' },
+  'DD': { name: 'Sulawesi Selatan (Makassar / Gowa / Maros / Pangkep)', island: 'Sulawesi' },
+  'DC': { name: 'Sulawesi Barat (Mamuju / Majene / Polewali Mandar)', island: 'Sulawesi' },
+  'DT': { name: 'Sulawesi Tenggara (Kendari / Bau-Bau / Kolaka)', island: 'Sulawesi' },
 
   // Maluku & Papua
-  'DE': { name: 'Maluku (Ambon)', island: 'Maluku' },
-  'DG': { name: 'Maluku Utara (Ternate)', island: 'Maluku' },
-  'PA': { name: 'Papua (Jayapura)', island: 'Papua' },
-  'PB': { name: 'Papua Barat (Manokwari / Sorong)', island: 'Papua' },
+  'DE': { name: 'Maluku (Ambon / Maluku Tengah / Buru)', island: 'Maluku' },
+  'DG': { name: 'Maluku Utara (Ternate / Tidore)', island: 'Maluku' },
+  'PA': { name: 'Papua (Jayapura / Keerom / Sarmi)', island: 'Papua' },
+  'PB': { name: 'Papua Barat (Manokwari / Sorong / Fakfak)', island: 'Papua' },
 };
 
-export function getRegionInfo(plateNumber: string): { code: string; name: string; island: string } | null {
-  if (!plateNumber) return null;
-  const match = plateNumber.trim().toUpperCase().match(/^([A-Z]{1,2})/);
-  if (!match) return null;
-  const code = match[1];
-  const info = INDONESIAN_PLATE_REGIONS[code];
+export function getRegionInfo(prefix: string): { code: string; name: string; island: string } | null {
+  if (!prefix) return null;
+  const cleanPrefix = prefix.trim().toUpperCase();
+  const info = INDONESIAN_PLATE_REGIONS[cleanPrefix];
   if (info) {
-    return { code, name: info.name, island: info.island };
+    return { code: cleanPrefix, name: info.name, island: info.island };
   }
   return null;
 }

@@ -14,7 +14,7 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * Loads an ONNX model from a URL or ArrayBuffer, with auto-fallback to available model filenames
+ * Loads the primary dedicated YOLO license plate detector model
  */
 export async function loadOnnxModel(modelSource: string | ArrayBuffer = '/models/plate_detector.onnx'): Promise<ort.InferenceSession> {
   if (onnxSession) {
@@ -31,7 +31,7 @@ export async function loadOnnxModel(modelSource: string | ArrayBuffer = '/models
 
   const candidateUrls =
     typeof modelSource === 'string'
-      ? [modelSource, '/models/datakendaraan.onnx', '/models/best.onnx', '/models/plate_detector.onnx']
+      ? [modelSource, '/models/best.onnx', '/models/plate_detector.onnx']
       : [modelSource];
 
   let lastError: any = null;
@@ -46,16 +46,15 @@ export async function loadOnnxModel(modelSource: string | ArrayBuffer = '/models
       onnxSession = session;
       isModelLoading = false;
       activeModelName = typeof url === 'string' ? url : 'custom_buffer';
-      console.log('✅ Berhasil memuat model ONNX:', activeModelName);
+      console.log('✅ Berhasil memuat model Plat ONNX:', activeModelName);
       return session;
     } catch (err) {
       lastError = err;
-      // try next candidate
     }
   }
 
   isModelLoading = false;
-  modelLoadError = lastError?.message || 'Gagal memuat model ONNX';
+  modelLoadError = lastError?.message || 'Gagal memuat model Plat ONNX';
   console.warn('ONNX Model Load Notice:', modelLoadError);
   throw lastError || new Error(modelLoadError!);
 }
@@ -79,9 +78,9 @@ interface RawPrediction {
 }
 
 /**
- * Performs Non-Maximum Suppression (NMS) to eliminate overlapping lower-confidence boxes
+ * Performs Non-Maximum Suppression (NMS) to eliminate overlapping lower-confidence plate boxes
  */
-function applyNms(boxes: RawPrediction[], iouThreshold: number = 0.45): RawPrediction[] {
+function applyNms(boxes: RawPrediction[], iouThreshold: number = 0.40): RawPrediction[] {
   boxes.sort((a, b) => b.conf - a.conf);
   const selected: RawPrediction[] = [];
 
@@ -117,14 +116,14 @@ function applyNms(boxes: RawPrediction[], iouThreshold: number = 0.45): RawPredi
 }
 
 /**
- * High-accuracy Letterbox YOLOv8 ONNX Inference with Pixel-Perfect Bounding Box Alignment
+ * High-accuracy Letterbox YOLOv8 ONNX Inference targeting ONLY vehicle license plates
  */
 export async function detectPlatesWithOnnx(
   sourceCanvas: HTMLCanvasElement,
-  confidenceThreshold: number = 0.30
+  confidenceThreshold: number = 0.25
 ): Promise<PlateCandidate[]> {
   if (!onnxSession) {
-    throw new Error('Model ONNX belum dimuat.');
+    throw new Error('Model ONNX Plat belum dimuat.');
   }
 
   const modelInputSize = 640;
@@ -213,6 +212,11 @@ export async function detectPlatesWithOnnx(
       }
     }
 
+    // In a multi-class model (e.g. car=0, plate=1), ensure we ONLY take plate (classId 1 or single-class model)
+    if (numClasses > 1 && bestClass === 0) {
+      continue;
+    }
+
     if (bestConf >= confidenceThreshold) {
       // Unpad and scale coordinates back to original source image
       const origCx = (cx - padX) / scale;
@@ -225,8 +229,17 @@ export async function detectPlatesWithOnnx(
       const finalW = Math.min(srcW - origX, Math.round(origW));
       const finalH = Math.min(srcH - origY, Math.round(origH));
 
-      // Filter unrealistic tiny noise
-      if (finalW >= 24 && finalH >= 10) {
+      // Filter: Vehicle license plates have typical aspect ratio between 1.3:1 (motorbike) and 5.5:1 (car/truck)
+      const aspect = finalW / Math.max(1, finalH);
+
+      if (
+        finalW >= 36 &&
+        finalH >= 12 &&
+        finalW <= srcW * 0.95 &&
+        finalH <= srcH * 0.95 &&
+        aspect >= 1.3 &&
+        aspect <= 5.8
+      ) {
         rawPredictions.push({
           x: origX,
           y: origY,
@@ -240,7 +253,7 @@ export async function detectPlatesWithOnnx(
   }
 
   // 3. Apply NMS
-  const nmsBoxes = applyNms(rawPredictions, 0.45);
+  const nmsBoxes = applyNms(rawPredictions, 0.40);
   const candidates: PlateCandidate[] = [];
 
   for (const box of nmsBoxes) {

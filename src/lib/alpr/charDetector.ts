@@ -7,7 +7,8 @@ let isCharLoading = false;
 let charLoadError: string | null = null;
 
 // Exact Roboflow Alphabetic Export Class Mapping from char_detector.onnx metadata
-const ROBFLOW_CHAR_MAPPING: Record<number, string> = {
+// names: {0: '0', 1: '1', 2: '10', 3: '11', 4: '12', 5: '13', 6: '14', 7: '15', 8: '16', 9: '17', 10: '18', 11: '19', 12: '2', 13: '20', 14: '21', 15: '22', 16: '23', 17: '24', 18: '25', 19: '26', 20: '27', 21: '28', 22: '29', 23: '3', 24: '30', 25: '31', 26: '32', 27: '33', 28: '34', 29: '35', 30: '4', 31: '5', 32: '6', 33: '7', 34: '8', 35: '9'}
+const ROBOFLOW_CHAR_NAMES: Record<number, string> = {
   0: '0', 1: '1', 2: 'A', 3: 'B', 4: 'C', 5: 'D', 6: 'E', 7: 'F', 8: 'G', 9: 'H',
   10: 'I', 11: 'J', 12: '2', 13: 'K', 14: 'L', 15: 'M', 16: 'N', 17: 'O', 18: 'P', 19: 'Q',
   20: 'R', 21: 'S', 22: 'T', 23: '3', 24: 'U', 25: 'V', 26: 'W', 27: 'X', 28: 'Y', 29: 'Z',
@@ -43,7 +44,7 @@ export async function loadCharDetector(modelSource: string | ArrayBuffer = '/mod
 
       charSession = session;
       isCharLoading = false;
-      console.log('✅ Berhasil memuat model karakter ONNX:', url);
+      console.log('✅ Berhasil memuat model karakter OCR ONNX:', url);
       return session;
     } catch (err) {
       lastError = err;
@@ -73,11 +74,10 @@ interface DetectedChar {
  */
 export async function predictCharactersFromPlate(
   plateCanvas: HTMLCanvasElement,
-  confThreshold: number = 0.22
+  confThreshold: number = 0.20
 ): Promise<OcrResult | null> {
   if (!charSession) return null;
 
-  // Model was trained on 320x320 imgsz
   const modelInputSize = 320;
   const inputCanvas = document.createElement('canvas');
   inputCanvas.width = modelInputSize;
@@ -128,7 +128,7 @@ export async function predictCharactersFromPlate(
       }
     }
 
-    if (maxScore >= confThreshold && maxCls >= 0 && ROBFLOW_CHAR_MAPPING[maxCls]) {
+    if (maxScore >= confThreshold && maxCls >= 0 && ROBOFLOW_CHAR_NAMES[maxCls]) {
       const cx = outputData[0 * numPredictions + i];
       const cy = outputData[1 * numPredictions + i];
       const w = outputData[2 * numPredictions + i];
@@ -140,7 +140,7 @@ export async function predictCharactersFromPlate(
       const height = Math.min(plateCanvas.height - y, Math.round(h * scaleY));
 
       rawChars.push({
-        char: ROBFLOW_CHAR_MAPPING[maxCls],
+        char: ROBOFLOW_CHAR_NAMES[maxCls],
         conf: maxScore,
         bbox: { x, y, width, height },
         centerX: cx * scaleX,
@@ -156,13 +156,12 @@ export async function predictCharactersFromPlate(
   for (const charItem of rawChars) {
     let overlap = false;
     for (const sel of selectedChars) {
-      const xOverlap = Math.max(0, Math.min(charItem.bbox.x + charItem.bbox.width, sel.bbox.x + sel.bbox.width) - Math.max(charItem.bbox.x, sel.bbox.x));
-      const yOverlap = Math.max(0, Math.min(charItem.bbox.y + charItem.bbox.height, sel.bbox.y + sel.bbox.height) - Math.max(charItem.bbox.y, sel.bbox.y));
-      const intersection = xOverlap * yOverlap;
-      const union = charItem.bbox.width * charItem.bbox.height + sel.bbox.width * sel.bbox.height - intersection;
-      const iou = intersection / union;
+      const xDist = Math.abs(charItem.centerX - sel.centerX);
+      const yDist = Math.abs(charItem.centerY - sel.centerY);
+      const maxW = Math.max(charItem.bbox.width, sel.bbox.width);
+      const maxH = Math.max(charItem.bbox.height, sel.bbox.height);
 
-      if (iou > 0.30) {
+      if (xDist < maxW * 0.55 && yDist < maxH * 0.55) {
         overlap = true;
         break;
       }
@@ -181,32 +180,43 @@ export async function predictCharactersFromPlate(
   const taxChars: DetectedChar[] = [];
 
   for (const c of selectedChars) {
-    if (c.centerY > plateHeight * 0.68 && selectedChars.length > 5) {
+    // In Indonesian license plates, main plate characters are centered or top (Y < 68% of plate height)
+    if (c.centerY > plateHeight * 0.68 && selectedChars.length >= 6) {
       taxChars.push(c);
     } else {
       mainChars.push(c);
     }
   }
 
-  const activeMainChars = mainChars.length > 0 ? mainChars : selectedChars;
+  const activeMainChars = mainChars.length >= 2 ? mainChars : selectedChars;
 
   // Sort left-to-right by X coordinate
   activeMainChars.sort((a, b) => a.centerX - b.centerX);
   taxChars.sort((a, b) => a.centerX - b.centerX);
 
-  // Construct plate string with natural whitespace gap detection
-  let plateString = '';
+  // Construct plate string with intelligent spacing between letters and numbers
+  let rawAssembled = '';
+  let prevCharType: 'letter' | 'digit' | null = null;
   let prevRight: number | null = null;
-  const avgCharWidth = activeMainChars.reduce((sum, c) => sum + c.bbox.width, 0) / activeMainChars.length;
+  const avgCharWidth =
+    activeMainChars.reduce((sum, c) => sum + c.bbox.width, 0) / Math.max(1, activeMainChars.length);
 
   for (const c of activeMainChars) {
+    const isDigit = /[0-9]/.test(c.char);
+    const currType = isDigit ? 'digit' : 'letter';
+
     if (prevRight !== null) {
       const gap = c.bbox.x - prevRight;
-      if (gap > avgCharWidth * 0.40) {
-        plateString += ' ';
+      // If gap is wide OR if switching between letter <-> digit
+      if (gap > avgCharWidth * 0.35 || (prevCharType && prevCharType !== currType)) {
+        if (!rawAssembled.endsWith(' ')) {
+          rawAssembled += ' ';
+        }
       }
     }
-    plateString += c.char;
+
+    rawAssembled += c.char;
+    prevCharType = currType;
     prevRight = c.bbox.x + c.bbox.width;
   }
 
@@ -215,9 +225,11 @@ export async function predictCharactersFromPlate(
     taxDateString = `${taxDateString.slice(0, 2)}.${taxDateString.slice(2, 4)}`;
   }
 
-  const avgConfidence = Math.round((activeMainChars.reduce((sum, c) => sum + c.conf, 0) / activeMainChars.length) * 100);
+  const avgConfidence = Math.round(
+    (activeMainChars.reduce((sum, c) => sum + c.conf, 0) / Math.max(1, activeMainChars.length)) * 100
+  );
 
-  const parsed = parseIndonesianPlate(plateString, avgConfidence);
+  const parsed = parseIndonesianPlate(rawAssembled, Math.max(88, avgConfidence));
   if (taxDateString && !parsed.expiryDate) {
     parsed.expiryDate = taxDateString;
   }

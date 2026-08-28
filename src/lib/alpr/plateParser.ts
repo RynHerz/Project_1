@@ -1,5 +1,5 @@
 import { OcrResult } from './types';
-import { getRegionInfo } from './indonesianRegions';
+import { getRegionInfo, INDONESIAN_PLATE_REGIONS } from './indonesianRegions';
 
 // Substitution mapping for MIDDLE NUMBERS (Letters mistaken for numbers)
 export const CHAR_TO_NUM_MAP: Record<string, string> = {
@@ -33,21 +33,16 @@ export const NUM_TO_CHAR_MAP: Record<string, string> = {
 export const PREFIX_OCR_CORRECTIONS: Record<string, string> = {
   ')K': 'DK', '(K': 'DK', ']K': 'DK', '[K': 'DK', 'JK': 'DK',
   'PK': 'DK', '0K': 'DK', 'OK': 'DK', 'DX': 'DK', 'D<': 'DK', '1K': 'DK',
+  '8E': 'BE', '0E': 'BE', '6E': 'BE',
   '8': 'B', '0': 'D', '5': 'S', '1': 'I'
 };
 
-export const VALID_INDONESIA_PREFIXES = new Set([
-  'DK', 'B', 'D', 'E', 'F', 'T', 'Z', 'G', 'H', 'K', 'R', 'AA', 'AD', 'AB',
-  'L', 'M', 'N', 'P', 'S', 'W', 'AE', 'AG', 'BL', 'BK', 'BB', 'BA', 'BM',
-  'BP', 'BG', 'BN', 'BE', 'BD', 'BH', 'KB', 'DA', 'KH', 'KT', 'KU', 'DB',
-  'DL', 'DM', 'DN', 'DT', 'DC', 'DD', 'DP', 'DW', 'DE', 'DG', 'PA', 'PB',
-  'DR', 'EA', 'DH', 'EB', 'ED'
-]);
+export const VALID_INDONESIA_PREFIXES = new Set(Object.keys(INDONESIAN_PLATE_REGIONS));
 
 export function cleanOcrText(rawText: string): string {
   if (!rawText) return '';
   let text = rawText.toUpperCase().replace(/[\r\n\t]+/g, ' ');
-  // Strip frame brackets, pipes, quotes, and punctuation noise from edges
+  // Strip frame brackets, pipes, quotes, and punctuation noise
   text = text.replace(/[\[\]\(\)\{\}\|_~"'\\]/g, ' ');
   text = text.replace(/[^A-Z0-9\s.\-]/g, ' ');
   return text.replace(/\s+/g, ' ').trim();
@@ -59,6 +54,7 @@ export function isTaxDateToken(token: string): boolean {
 }
 
 export function repairPrefix(prefix: string): string {
+  if (!prefix) return '';
   const p = prefix.toUpperCase().trim();
   if (PREFIX_OCR_CORRECTIONS[p]) return PREFIX_OCR_CORRECTIONS[p];
 
@@ -76,6 +72,7 @@ export function repairPrefix(prefix: string): string {
 }
 
 export function repairNumber(numStr: string): string {
+  if (!numStr) return '';
   let corrected = '';
   for (const ch of numStr) {
     if (CHAR_TO_NUM_MAP[ch]) {
@@ -88,6 +85,7 @@ export function repairNumber(numStr: string): string {
 }
 
 export function repairSuffix(sufStr: string): string {
+  if (!sufStr) return '';
   let corrected = '';
   for (const ch of sufStr) {
     if (ch === 'Q') {
@@ -104,17 +102,18 @@ export function repairSuffix(sufStr: string): string {
 /**
  * Parses and formats raw OCR string with Samsat heuristic correction matrix
  */
-export function parseIndonesianPlate(rawText: string, rawConfidence: number = 75): OcrResult {
+export function parseIndonesianPlate(rawText: string, rawConfidence: number = 80): OcrResult {
   const cleaned = cleanOcrText(rawText);
 
   let expiryDate: string | undefined;
-  const tokens: string[] = [];
+  const rawTokens = cleaned.split(' ').filter(Boolean);
+  const plateTokens: string[] = [];
 
-  for (const t of cleaned.split(' ')) {
+  for (const t of rawTokens) {
     if (isTaxDateToken(t)) {
       expiryDate = t.replace(/\s+/g, '.').replace(/-/g, '.');
-    } else if (t.length > 0) {
-      tokens.push(t);
+    } else {
+      plateTokens.push(t);
     }
   }
 
@@ -125,27 +124,27 @@ export function parseIndonesianPlate(rawText: string, rawConfidence: number = 75
   let isValid = false;
   let score = rawConfidence;
 
-  // STRATEGY 1: 3 Tokens (e.g. ['DK', '5248', 'HG'] or ['B', '1234', 'ABC'])
-  if (tokens.length === 3) {
-    const p = repairPrefix(tokens[0]);
-    const n = repairNumber(tokens[1]);
-    const s = repairSuffix(tokens[2]);
+  // STRATEGY 1: 3 Tokens (e.g. ['BE', '1193', 'ALQ'] or ['B', '2581', 'GDC'])
+  if (plateTokens.length === 3) {
+    const p = repairPrefix(plateTokens[0]);
+    const n = repairNumber(plateTokens[1]);
+    const s = repairSuffix(plateTokens[2]);
 
     if (p.length >= 1 && n.length >= 1) {
       prefix = p;
       number = n;
       suffix = s;
       formattedPlate = `${p} ${n} ${s}`.trim();
-      isValid = true;
-      score = VALID_INDONESIA_PREFIXES.has(p) ? Math.max(88, score) : score;
+      isValid = VALID_INDONESIA_PREFIXES.has(p) && /^[0-9]{1,4}$/.test(n);
+      score = isValid ? Math.max(92, score + 10) : score;
     }
   }
 
-  // STRATEGY 2: 2 Tokens (e.g. ['DK5248', 'HG'] or ['B', '6282USA'])
-  if (!isValid && tokens.length === 2) {
-    const [t1, t2] = tokens;
+  // STRATEGY 2: 2 Tokens (e.g. ['BE1945', 'F'] or ['B', '2581GDC'])
+  if (!isValid && plateTokens.length === 2) {
+    const [t1, t2] = plateTokens;
 
-    // Case A: t1="DK5248", t2="HG"
+    // Case A: t1="BE1945", t2="F"
     const m1 = t1.match(/^([A-Z0-9]{1,2})([0-9A-Z]{1,4})$/);
     if (m1) {
       const p = repairPrefix(m1[1]);
@@ -156,12 +155,12 @@ export function parseIndonesianPlate(rawText: string, rawConfidence: number = 75
         number = n;
         suffix = s;
         formattedPlate = `${p} ${n} ${s}`.trim();
-        isValid = true;
-        score = Math.max(82, score);
+        isValid = VALID_INDONESIA_PREFIXES.has(p) && /^[0-9]{1,4}$/.test(n);
+        score = isValid ? Math.max(88, score + 8) : score;
       }
     }
 
-    // Case B: t1="B", t2="6282USA"
+    // Case B: t1="B", t2="2581GDC"
     if (!isValid) {
       const m2 = t2.match(/^([0-9A-Z]{1,4})([A-Z0-9]{1,3})$/);
       if (m2) {
@@ -173,42 +172,58 @@ export function parseIndonesianPlate(rawText: string, rawConfidence: number = 75
           number = n;
           suffix = s;
           formattedPlate = `${p} ${n} ${s}`.trim();
-          isValid = true;
-          score = Math.max(82, score);
+          isValid = VALID_INDONESIA_PREFIXES.has(p) && /^[0-9]{1,4}$/.test(n);
+          score = isValid ? Math.max(88, score + 8) : score;
         }
       }
     }
   }
 
-  // STRATEGY 3: Compact string (e.g. "DK5248HG" or "B1234ABC")
+  // STRATEGY 3: Compact string (e.g. "BE1945F" or "B2581GDC" or "DK5248HG")
   if (!isValid) {
     const compact = cleaned.replace(/[^A-Z0-9]/g, '');
-    const digitMatch = compact.match(/([0-9]{1,4})/);
-    if (digitMatch && digitMatch.index !== undefined) {
-      const startD = digitMatch.index;
-      const endD = startD + digitMatch[0].length;
 
-      const rawP = compact.slice(0, startD);
-      const rawN = compact.slice(startD, endD);
-      const rawS = compact.slice(endD);
+    // Extract leading letters (1-2 chars), middle digits (1-4 chars), trailing letters (0-3 chars)
+    const matchCompact = compact.match(/^([A-Z]{1,2})([0-9]{1,4})([A-Z]{0,3})$/);
+    if (matchCompact) {
+      const p = repairPrefix(matchCompact[1]);
+      const n = matchCompact[2];
+      const s = matchCompact[3] || '';
+      prefix = p;
+      number = n;
+      suffix = s;
+      formattedPlate = `${p} ${n} ${s}`.trim();
+      isValid = VALID_INDONESIA_PREFIXES.has(p);
+      score = isValid ? Math.max(90, score + 6) : score;
+    } else {
+      // Fuzzy extraction by finding digit group index
+      const digitMatch = compact.match(/([0-9]{1,4})/);
+      if (digitMatch && digitMatch.index !== undefined) {
+        const startD = digitMatch.index;
+        const endD = startD + digitMatch[0].length;
 
-      const p = repairPrefix(rawP || (compact.startsWith('DK') ? 'DK' : 'B'));
-      const n = repairNumber(rawN);
-      const s = repairSuffix(rawS);
+        const rawP = compact.slice(0, startD);
+        const rawN = compact.slice(startD, endD);
+        const rawS = compact.slice(endD);
 
-      if (p && n) {
-        prefix = p;
-        number = n;
-        suffix = s;
-        formattedPlate = `${p} ${n} ${s}`.trim();
-        isValid = true;
-        score = Math.max(75, score);
+        const p = repairPrefix(rawP);
+        const n = repairNumber(rawN);
+        const s = repairSuffix(rawS);
+
+        if (p && n) {
+          prefix = p;
+          number = n;
+          suffix = s;
+          formattedPlate = `${p} ${n} ${s}`.trim();
+          isValid = VALID_INDONESIA_PREFIXES.has(p) && /^[0-9]{1,4}$/.test(n);
+          score = isValid ? Math.max(85, score) : score;
+        }
       }
     }
   }
 
-  // Fallback
-  if (!isValid) {
+  // Fallback if unparsed
+  if (!formattedPlate) {
     formattedPlate = cleaned || 'TIDAK TERBACA';
   }
 
@@ -219,7 +234,7 @@ export function parseIndonesianPlate(rawText: string, rawConfidence: number = 75
     cleanedText: cleaned,
     formattedPlate,
     expiryDate,
-    confidence: Math.min(100, score),
+    confidence: Math.min(100, Math.max(isValid ? 75 : 40, score)),
     isValidFormat: isValid,
     regionCode: prefix || undefined,
     regionName: region ? `${region.name} (${region.island})` : undefined,
