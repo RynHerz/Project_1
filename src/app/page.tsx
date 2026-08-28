@@ -5,7 +5,6 @@ import confetti from 'canvas-confetti';
 import { Navbar, ActiveTab } from '../components/Navbar';
 import { VehicleInspector } from '../components/VehicleInspector';
 import { CargoManifestDashboard } from '../components/CargoManifestDashboard';
-import { DatasetTester } from '../components/DatasetTester';
 import { DetectionHistory } from '../components/DetectionHistory';
 import { PlateDetailModal } from '../components/PlateDetailModal';
 import { AccessManagerModal } from '../components/AccessManagerModal';
@@ -189,15 +188,6 @@ export default function Home() {
           <CargoManifestDashboard
             history={history}
             onOpenGatePassSlip={(res) => setSelectedGatePassResult(res)}
-            onOpenPlateDetail={(res) => setSelectedPlateDetail(res)}
-          />
-        )}
-
-        {activeTab === 'dataset' && (
-          <DatasetTester
-            onNewDetection={handleNewDetection}
-            whitelistRules={whitelistRules}
-            soundEnabled={soundEnabled}
             onOpenPlateDetail={(res) => setSelectedPlateDetail(res)}
           />
         )}

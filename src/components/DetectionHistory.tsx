@@ -214,7 +214,7 @@ export const DetectionHistory: React.FC<DetectionHistoryProps> = ({
       <CardContent className="p-0">
         {filteredHistory.length > 0 ? (
           <div className="overflow-x-auto">
-            <Table>
+            <Table className="min-w-[680px]">
               <TableHeader>
                 <TableRow className="text-[11px] hover:bg-transparent">
                   <TableHead className="py-3 px-4">Thumbnail</TableHead>

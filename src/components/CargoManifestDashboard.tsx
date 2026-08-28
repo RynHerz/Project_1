@@ -194,7 +194,7 @@ export const CargoManifestDashboard: React.FC<CargoManifestDashboardProps> = ({
         <CardContent className="p-0">
           {vehiclesWithCargo.length > 0 ? (
             <div className="overflow-x-auto">
-              <Table>
+              <Table className="min-w-[720px]">
                 <TableHeader>
                   <TableRow className="text-[11px] hover:bg-transparent">
                     <TableHead className="py-3 px-4">Plat Kendaraan</TableHead>

@@ -210,8 +210,8 @@ export const PlateDetailModal: React.FC<PlateDetailModalProps> = ({
               <div>
                 <h5 className="text-xs font-semibold text-foreground mb-2">Daftar Muatan ({m?.items?.length || 0} Item):</h5>
                 {m?.items && m.items.length > 0 ? (
-                  <div className="rounded-lg border border-border overflow-hidden">
-                    <Table>
+                  <div className="rounded-lg border border-border overflow-x-auto">
+                    <Table className="min-w-[440px]">
                       <TableHeader>
                         <TableRow className="text-[10px]">
                           <TableHead className="h-7 py-1 px-3">Nama Barang</TableHead>

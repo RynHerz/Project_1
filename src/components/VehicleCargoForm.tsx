@@ -429,8 +429,8 @@ export const VehicleCargoForm: React.FC<VehicleCargoFormProps> = ({
 
           {/* Items Table */}
           {manifest.items.length > 0 ? (
-            <div className="rounded-md border border-border">
-              <Table>
+            <div className="rounded-md border border-border overflow-x-auto">
+              <Table className="min-w-[540px]">
                 <TableHeader>
                   <TableRow className="text-[11px] hover:bg-transparent">
                     <TableHead className="h-8">Barang</TableHead>
