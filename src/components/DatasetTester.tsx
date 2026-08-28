@@ -7,17 +7,24 @@ import {
   Download,
   CheckCircle2,
   XCircle,
-  Clock,
-  Sparkles,
-  Layers,
   FileCode2,
   Copy,
   Check,
-  BarChart3,
-  HelpCircle,
+  Layers,
 } from 'lucide-react';
-import { DatasetItem, DatasetEvaluationReport, DetectionResult, WhitelistRule } from '../lib/alpr/types';
+import { DatasetItem, DetectionResult, WhitelistRule } from '../lib/alpr/types';
 import { runAlprPipeline } from '../lib/alpr/pipeline';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 interface DatasetTesterProps {
   onNewDetection: (result: DetectionResult) => void;
@@ -95,7 +102,6 @@ export const DatasetTester: React.FC<DatasetTesterProps> = ({
       setItems([...updatedItems]);
 
       try {
-        // Load image into HTMLImageElement
         const img = new Image();
         img.crossOrigin = 'anonymous';
         img.src = current.imageUrl;
@@ -114,7 +120,6 @@ export const DatasetTester: React.FC<DatasetTesterProps> = ({
         current.processingTimeMs = elapsed;
         current.status = 'success';
 
-        // Check if ground truth matches
         if (current.groundTruth) {
           const normGt = current.groundTruth.replace(/\s+/g, '').toUpperCase();
           const normDet = detection.formattedPlate.replace(/\s+/g, '').toUpperCase();
@@ -186,13 +191,12 @@ export const DatasetTester: React.FC<DatasetTesterProps> = ({
 # Jalankan script ini di Google Colab atau terminal Python lokal Anda
 # =========================================================================
 
-# 1. Install Ultralytics YOLO
 !pip install ultralytics onnx
 
 import os
 from ultralytics import YOLO
 
-# 2. Siapkan dataset.yaml yang mengarah ke folder gambar plat Anda
+# Siapkan dataset.yaml
 yaml_config = """
 path: ./dataset_plat
 train: images/train
@@ -203,23 +207,21 @@ names:
 with open('data.yaml', 'w') as f:
     f.write(yaml_config)
 
-# 3. Train model YOLOv8 Nano (ringan & cepat untuk browser WebAssembly)
+# Train model YOLOv8 Nano
 model = YOLO('yolov8n.pt')
 results = model.train(
     data='data.yaml',
     epochs=50,
     imgsz=640,
     batch=16,
-    device='0' # atau 'cpu'
+    device='0'
 )
 
-# 4. Export bobot model ke format ONNX untuk Next.js
+# Export bobot model ke format ONNX
 success = model.export(format='onnx', imgsz=640, opset=12)
 print("Model berhasil diekspor! File tersimpan di: runs/detect/train/weights/best.onnx")
 
-# 5. Langkah Terakhir:
-# Copy file 'best.onnx' ke folder project Next.js Anda di:
-# -> public/models/plate_detector.onnx
+# Salin best.onnx ke public/models/plate_detector.onnx
 `;
 
   const handleCopySnippet = () => {
@@ -231,62 +233,64 @@ print("Model berhasil diekspor! File tersimpan di: runs/detect/train/weights/bes
   return (
     <div className="flex flex-col gap-6">
       {/* Sub Tab Header */}
-      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
+        <div className="flex items-center gap-1 bg-muted p-1 rounded-lg border border-border">
           <button
             onClick={() => setActiveSubTab('tester')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+            className={`px-3 py-1 rounded-md text-xs font-medium transition cursor-pointer ${
               activeSubTab === 'tester'
-                ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/30'
-                : 'bg-slate-900 text-slate-400 hover:text-slate-200'
+                ? 'bg-background text-foreground shadow-sm font-semibold'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            📊 Evaluator & Tester Dataset
+            Evaluator Dataset
           </button>
           <button
             onClick={() => setActiveSubTab('training_guide')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+            className={`px-3 py-1 rounded-md text-xs font-medium transition cursor-pointer ${
               activeSubTab === 'training_guide'
-                ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/30'
-                : 'bg-slate-900 text-slate-400 hover:text-slate-200'
+                ? 'bg-background text-foreground shadow-sm font-semibold'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            🧠 Panduan Training & Export ONNX
+            Panduan Training YOLO
           </button>
         </div>
 
         {items.length > 0 && activeSubTab === 'tester' && (
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={exportReportToCsv}
             disabled={processedCount === 0}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-slate-200 text-xs font-semibold border border-slate-700 transition"
+            className="text-xs gap-1.5 h-8"
           >
-            <Download className="w-3.5 h-3.5 text-cyan-400" /> Export Laporan CSV
-          </button>
+            <Download className="w-3.5 h-3.5" /> Export CSV
+          </Button>
         )}
       </div>
 
       {activeSubTab === 'tester' ? (
         <>
           {/* Top Actions: Upload Folder & Run Batch */}
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
-            {/* Input Dropzone Area */}
-            <div className="md:col-span-8 flex flex-wrap items-center gap-3">
-              {/* Select Folder Button */}
-              <button
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
                 onClick={() => folderInputRef.current?.click()}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold shadow-lg shadow-cyan-600/25 transition"
+                size="sm"
+                className="gap-2 text-xs font-semibold"
               >
                 <FolderUp className="w-4 h-4" /> Masukkan Folder Dataset
-              </button>
+              </Button>
 
-              {/* Select Multiple Files */}
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => filesInputRef.current?.click()}
-                className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 text-xs font-medium border border-slate-700 transition"
+                className="gap-2 text-xs"
               >
-                <Layers className="w-4 h-4 text-cyan-400" /> Pilih Banyak File Gambar
-              </button>
+                <Layers className="w-4 h-4" /> Pilih Banyak File
+              </Button>
 
               {/* Hidden Inputs */}
               {/* @ts-ignore */}
@@ -311,235 +315,237 @@ print("Model berhasil diekspor! File tersimpan di: runs/detect/train/weights/bes
               />
 
               {items.length > 0 && (
-                <span className="text-xs text-slate-400">
-                  Total <span className="font-bold text-white">{items.length}</span> gambar dimuat
+                <span className="text-xs text-muted-foreground pl-2 font-mono">
+                  {items.length} file dimuat
                 </span>
               )}
             </div>
 
-            {/* Run Batch Evaluation Button */}
-            <div className="md:col-span-4 flex justify-end">
-              <button
+            <div>
+              <Button
                 onClick={runBatchEvaluation}
                 disabled={items.length === 0 || isEvaluating}
-                className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold shadow-lg shadow-emerald-600/25 transition"
+                size="sm"
+                className="w-full sm:w-auto gap-2 text-xs font-semibold"
               >
-                <Play className="w-4 h-4 fill-current" />
+                <Play className="w-3.5 h-3.5 fill-current" />
                 {isEvaluating ? 'Sedang Mengevaluasi...' : 'Jalankan Pengujian Batch'}
-              </button>
+              </Button>
             </div>
           </div>
 
           {/* Progress Bar when Evaluating */}
           {isEvaluating && (
-            <div className="rounded-xl bg-slate-900 border border-slate-800 p-4 shadow-lg">
-              <div className="flex items-center justify-between text-xs font-medium text-slate-300 mb-2">
+            <Card className="p-4">
+              <div className="flex items-center justify-between text-xs font-medium text-muted-foreground mb-2">
                 <span>Memproses dataset di browser (Client-side AI)...</span>
-                <span className="font-mono text-cyan-400">{progress}%</span>
+                <span className="font-mono text-foreground font-bold">{progress}%</span>
               </div>
-              <div className="w-full h-2 rounded-full bg-slate-950 overflow-hidden">
+              <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-cyan-500 to-emerald-500 transition-all duration-300 rounded-full"
+                  className="h-full bg-primary transition-all duration-300 rounded-full"
                   style={{ width: `${progress}%` }}
                 />
               </div>
-            </div>
+            </Card>
           )}
 
           {/* Accuracy & Performance Summary Cards */}
           {items.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
-                <span className="text-[11px] text-slate-400 uppercase font-medium">Total Gambar</span>
-                <div className="text-2xl font-black text-white mt-1 font-mono">{items.length}</div>
-              </div>
-              <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
-                <span className="text-[11px] text-slate-400 uppercase font-medium">Selesai Diuji</span>
-                <div className="text-2xl font-black text-cyan-400 mt-1 font-mono">
-                  {processedCount} <span className="text-xs font-normal text-slate-500">/ {items.length}</span>
+              <Card className="p-4">
+                <span className="text-[11px] text-muted-foreground uppercase font-medium">Total Gambar</span>
+                <div className="text-2xl font-bold font-mono text-foreground mt-1">{items.length}</div>
+              </Card>
+              <Card className="p-4">
+                <span className="text-[11px] text-muted-foreground uppercase font-medium">Selesai Diuji</span>
+                <div className="text-2xl font-bold font-mono text-foreground mt-1">
+                  {processedCount} <span className="text-xs font-normal text-muted-foreground">/ {items.length}</span>
                 </div>
-              </div>
-              <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
-                <span className="text-[11px] text-slate-400 uppercase font-medium">Akurasi Pembacaan</span>
-                <div className="text-2xl font-black text-emerald-400 mt-1 font-mono">{accuracyRate}%</div>
-              </div>
-              <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
-                <span className="text-[11px] text-slate-400 uppercase font-medium">Rata-rata Confidence</span>
-                <div className="text-2xl font-black text-indigo-400 mt-1 font-mono">{avgConfidence}%</div>
-              </div>
+              </Card>
+              <Card className="p-4">
+                <span className="text-[11px] text-muted-foreground uppercase font-medium">Akurasi Pembacaan</span>
+                <div className="text-2xl font-bold font-mono text-emerald-400 mt-1">{accuracyRate}%</div>
+              </Card>
+              <Card className="p-4">
+                <span className="text-[11px] text-muted-foreground uppercase font-medium">Rata-rata Confidence</span>
+                <div className="text-2xl font-bold font-mono text-foreground mt-1">{avgConfidence}%</div>
+              </Card>
             </div>
           )}
 
           {/* Dataset Table */}
           {items.length > 0 ? (
-            <div className="rounded-2xl bg-slate-900 border border-slate-800 shadow-xl overflow-hidden">
+            <Card>
               {/* Table Filter Tabs */}
-              <div className="flex items-center justify-between p-4 border-b border-slate-800 bg-slate-950/40">
-                <div className="flex items-center gap-2">
+              <CardHeader className="p-4 pb-3 border-b border-border flex flex-row items-center justify-between space-y-0">
+                <div className="flex items-center gap-1 bg-muted p-0.5 rounded-md border border-border">
                   <button
                     onClick={() => setFilterStatus('all')}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${
-                      filterStatus === 'all' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-slate-200'
+                    className={`px-2.5 py-1 rounded text-xs font-medium transition cursor-pointer ${
+                      filterStatus === 'all' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
                     Semua ({items.length})
                   </button>
                   <button
                     onClick={() => setFilterStatus('match')}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${
-                      filterStatus === 'match'
-                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                        : 'text-slate-400 hover:text-slate-200'
+                    className={`px-2.5 py-1 rounded text-xs font-medium transition cursor-pointer ${
+                      filterStatus === 'match' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
                     Sesuai ({correctCount})
                   </button>
                   <button
                     onClick={() => setFilterStatus('mismatch')}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${
-                      filterStatus === 'mismatch'
-                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                        : 'text-slate-400 hover:text-slate-200'
+                    className={`px-2.5 py-1 rounded text-xs font-medium transition cursor-pointer ${
+                      filterStatus === 'mismatch' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
-                    Perlu Koreksi ({processedCount - correctCount})
+                    Koreksi ({processedCount - correctCount})
                   </button>
                 </div>
-              </div>
+              </CardHeader>
 
-              <div className="overflow-x-auto max-h-[500px]">
-                <table className="w-full text-left text-xs text-slate-300">
-                  <thead className="sticky top-0 bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
-                    <tr>
-                      <th className="py-3 px-4">Preview</th>
-                      <th className="py-3 px-4">Nama File</th>
-                      <th className="py-3 px-4">Ground Truth Target</th>
-                      <th className="py-3 px-4">Hasil Deteksi OCR</th>
-                      <th className="py-3 px-4">Confidence</th>
-                      <th className="py-3 px-4">Waktu</th>
-                      <th className="py-3 px-4">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/60 font-sans">
-                    {filteredItems.map((item) => (
-                      <tr key={item.id} className="hover:bg-slate-800/40 transition">
-                        <td className="py-2 px-4">
-                          <div className="w-12 h-8 rounded bg-slate-950 border border-slate-800 overflow-hidden flex items-center justify-center">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={item.imageUrl} alt={item.fileName} className="w-full h-full object-cover" />
-                          </div>
-                        </td>
-                        <td className="py-2 px-4 font-mono text-slate-300 max-w-[150px] truncate">{item.fileName}</td>
-                        <td className="py-2 px-4 font-mono font-bold text-slate-200">{item.groundTruth || '-'}</td>
-                        <td className="py-2 px-4 font-mono font-bold text-cyan-400">{item.detectedPlate || '-'}</td>
-                        <td className="py-2 px-4 font-mono">
-                          {item.confidence !== undefined ? `${item.confidence}%` : '-'}
-                        </td>
-                        <td className="py-2 px-4 font-mono text-slate-400">
-                          {item.processingTimeMs !== undefined ? `${item.processingTimeMs} ms` : '-'}
-                        </td>
-                        <td className="py-2 px-4">
-                          {item.status === 'processing' ? (
-                            <span className="text-cyan-400 font-medium animate-pulse">Memproses...</span>
-                          ) : item.isCorrect === true ? (
-                            <span className="inline-flex items-center gap-1 text-emerald-400 font-semibold">
-                              <CheckCircle2 className="w-3.5 h-3.5" /> Sesuai
-                            </span>
-                          ) : item.status === 'success' ? (
-                            <span className="inline-flex items-center gap-1 text-amber-400 font-semibold">
-                              <XCircle className="w-3.5 h-3.5" /> Berbeda
-                            </span>
-                          ) : item.status === 'failed' ? (
-                            <span className="inline-flex items-center gap-1 text-rose-400 font-semibold">
-                              <XCircle className="w-3.5 h-3.5" /> Gagal
-                            </span>
-                          ) : (
-                            <span className="text-slate-500">Menunggu</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto max-h-[500px]">
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-card z-10">
+                      <TableRow className="text-[11px] hover:bg-transparent">
+                        <TableHead className="py-3 px-4">Preview</TableHead>
+                        <TableHead className="py-3 px-4">Nama File</TableHead>
+                        <TableHead className="py-3 px-4">Ground Truth</TableHead>
+                        <TableHead className="py-3 px-4">Hasil OCR</TableHead>
+                        <TableHead className="py-3 px-4">Confidence</TableHead>
+                        <TableHead className="py-3 px-4">Waktu</TableHead>
+                        <TableHead className="py-3 px-4">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredItems.map((item) => (
+                        <TableRow key={item.id} className="text-xs">
+                          <TableCell className="py-2 px-4">
+                            <div className="w-12 h-8 rounded bg-muted border border-border overflow-hidden flex items-center justify-center">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={item.imageUrl} alt={item.fileName} className="w-full h-full object-cover" />
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-2 px-4 font-mono text-muted-foreground max-w-[150px] truncate text-[11px]">
+                            {item.fileName}
+                          </TableCell>
+                          <TableCell className="py-2 px-4 font-mono font-semibold text-foreground">
+                            {item.groundTruth || '-'}
+                          </TableCell>
+                          <TableCell className="py-2 px-4 font-mono font-bold text-foreground">
+                            {item.detectedPlate || '-'}
+                          </TableCell>
+                          <TableCell className="py-2 px-4 font-mono text-muted-foreground">
+                            {item.confidence !== undefined ? `${item.confidence}%` : '-'}
+                          </TableCell>
+                          <TableCell className="py-2 px-4 font-mono text-muted-foreground text-[11px]">
+                            {item.processingTimeMs !== undefined ? `${item.processingTimeMs} ms` : '-'}
+                          </TableCell>
+                          <TableCell className="py-2 px-4">
+                            {item.status === 'processing' ? (
+                              <span className="text-muted-foreground font-medium animate-pulse text-[11px]">Memproses...</span>
+                            ) : item.isCorrect === true ? (
+                              <Badge variant="success" className="text-[10px] gap-1">
+                                <CheckCircle2 className="w-3 h-3" /> Sesuai
+                              </Badge>
+                            ) : item.status === 'success' ? (
+                              <Badge variant="warning" className="text-[10px] gap-1">
+                                <XCircle className="w-3 h-3" /> Berbeda
+                              </Badge>
+                            ) : item.status === 'failed' ? (
+                              <Badge variant="destructive" className="text-[10px] gap-1">
+                                <XCircle className="w-3 h-3" /> Gagal
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground text-[11px]">Menunggu</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
           ) : (
-            <div className="rounded-2xl border-2 border-dashed border-slate-800 bg-slate-900/40 p-12 text-center">
-              <FolderUp className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-              <h3 className="text-base font-semibold text-white mb-1">Belum Ada Dataset yang Dimuat</h3>
-              <p className="text-xs text-slate-400 max-w-md mx-auto mb-4">
-                Klik tombol <b>Masukkan Folder Dataset</b> di atas untuk memasukkan folder gambar plat kendaraan Anda.
-                Sistem akan otomatis mengenali nama file dan menguji akurasi secara serentak.
+            <Card className="border-dashed p-12 text-center">
+              <FolderUp className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+              <h3 className="text-sm font-semibold text-foreground mb-1">Belum Ada Dataset yang Dimuat</h3>
+              <p className="text-xs text-muted-foreground max-w-md mx-auto mb-4">
+                Klik tombol <b>Masukkan Folder Dataset</b> di atas untuk memasukkan folder gambar plat kendaraan Anda untuk evaluasi akurasi serentak.
               </p>
-            </div>
+            </Card>
           )}
         </>
       ) : (
         /* Training & ONNX Export Guide Tab */
-        <div className="rounded-2xl bg-slate-900 border border-slate-800 p-6 shadow-xl flex flex-col gap-5">
+        <Card className="p-6 space-y-5">
           <div>
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <FileCode2 className="w-5 h-5 text-cyan-400" /> Panduan Training Dataset ke Web-Ready ONNX
-            </h3>
-            <p className="text-xs text-slate-400 mt-1">
-              Jika Anda ingin melatih model AI YOLOv8 dengan dataset plat kendaraan Anda sendiri dan menjalankannya 100% di browser tanpa server, ikuti langkah mudah berikut:
-            </p>
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <FileCode2 className="w-4 h-4 text-muted-foreground" /> Panduan Training Dataset ke Web ONNX
+            </CardTitle>
+            <CardDescription className="text-xs mt-1">
+              Jalankan langkah ini untuk melatih model AI YOLOv8 dengan dataset plat kendaraan Anda sendiri:
+            </CardDescription>
           </div>
 
-          {/* Steps */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800">
-              <div className="w-7 h-7 rounded-lg bg-cyan-600/20 border border-cyan-500/40 text-cyan-300 font-bold flex items-center justify-center text-xs mb-3">
+            <div className="p-4 rounded-lg bg-muted/40 border border-border">
+              <div className="w-6 h-6 rounded-md bg-secondary text-secondary-foreground font-bold flex items-center justify-center text-xs mb-2">
                 1
               </div>
-              <h4 className="text-sm font-semibold text-white mb-1">Labeling Dataset</h4>
-              <p className="text-xs text-slate-400">
-                Beri label kotak plat nomor pada dataset Anda (misal menggunakan Roboflow atau LabelImg format YOLO).
+              <h4 className="text-xs font-semibold text-foreground mb-1">Labeling Dataset</h4>
+              <p className="text-xs text-muted-foreground">
+                Beri label kotak plat nomor pada dataset Anda (format YOLO).
               </p>
             </div>
 
-            <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800">
-              <div className="w-7 h-7 rounded-lg bg-cyan-600/20 border border-cyan-500/40 text-cyan-300 font-bold flex items-center justify-center text-xs mb-3">
+            <div className="p-4 rounded-lg bg-muted/40 border border-border">
+              <div className="w-6 h-6 rounded-md bg-secondary text-secondary-foreground font-bold flex items-center justify-center text-xs mb-2">
                 2
               </div>
-              <h4 className="text-sm font-semibold text-white mb-1">Jalankan Script Training</h4>
-              <p className="text-xs text-slate-400">
-                Copy script Python di bawah ke Google Colab / PC Anda dan jalankan untuk mengekspor ke file <code className="text-cyan-300">.onnx</code>.
+              <h4 className="text-xs font-semibold text-foreground mb-1">Jalankan Training</h4>
+              <p className="text-xs text-muted-foreground">
+                Copy script Python di bawah dan jalankan untuk mengekspor ke file <code className="text-foreground">.onnx</code>.
               </p>
             </div>
 
-            <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800">
-              <div className="w-7 h-7 rounded-lg bg-cyan-600/20 border border-cyan-500/40 text-cyan-300 font-bold flex items-center justify-center text-xs mb-3">
+            <div className="p-4 rounded-lg bg-muted/40 border border-border">
+              <div className="w-6 h-6 rounded-md bg-secondary text-secondary-foreground font-bold flex items-center justify-center text-xs mb-2">
                 3
               </div>
-              <h4 className="text-sm font-semibold text-white mb-1">Masukkan ke Folder Next.js</h4>
-              <p className="text-xs text-slate-400">
-                Letakkan hasil export <code className="text-cyan-300">best.onnx</code> ke dalam folder:
-                <br />
-                <code className="text-emerald-400 font-mono text-[11px]">public/models/plate_detector.onnx</code>
+              <h4 className="text-xs font-semibold text-foreground mb-1">Letakkan di Next.js</h4>
+              <p className="text-xs text-muted-foreground">
+                Copy hasil export ke folder: <code className="text-foreground font-mono text-[11px]">public/models/plate_detector.onnx</code>
               </p>
             </div>
           </div>
 
           {/* Python Code Snippet Box */}
-          <div className="relative rounded-xl bg-slate-950 border border-slate-800 overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-2 bg-slate-900 border-b border-slate-800">
-              <span className="text-xs font-mono text-slate-300 flex items-center gap-2">
-                <FileCode2 className="w-3.5 h-3.5 text-cyan-400" /> train_and_export_onnx.py
+          <div className="rounded-lg bg-black/60 border border-border overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-2 bg-muted/30 border-b border-border">
+              <span className="text-xs font-mono text-muted-foreground flex items-center gap-2">
+                <FileCode2 className="w-3.5 h-3.5" /> train_and_export_onnx.py
               </span>
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={handleCopySnippet}
-                className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 border border-slate-700 transition"
+                className="h-7 text-xs gap-1.5"
               >
                 {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                {copiedCode ? 'Tersalin!' : 'Copy Script'}
-              </button>
+                {copiedCode ? 'Tersalin' : 'Copy Script'}
+              </Button>
             </div>
-            <pre className="p-4 text-xs font-mono text-cyan-300/90 overflow-x-auto leading-relaxed">
+            <pre className="p-4 text-xs font-mono text-muted-foreground overflow-x-auto leading-relaxed">
               {pythonTrainingSnippet}
             </pre>
           </div>
-        </div>
+        </Card>
       )}
     </div>
   );

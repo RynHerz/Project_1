@@ -10,17 +10,25 @@ import {
   Building,
   FileText,
   MapPin,
-  Scale,
   ShieldCheck,
-  AlertTriangle,
-  CheckCircle,
-  FileCheck2,
   Printer,
-  Sparkles,
   Layers,
   Info,
 } from 'lucide-react';
 import { VehicleCargoManifest, CargoItem } from '../lib/alpr/types';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 interface VehicleCargoFormProps {
   initialManifest?: VehicleCargoManifest;
@@ -41,9 +49,9 @@ const CARGO_CATEGORIES = [
 ];
 
 const CARGO_UNITS = [
+  'Box / Dus',
   'Kg',
   'Ton',
-  'Box / Dus',
   'Pallet',
   'Karung',
   'Pcs',
@@ -87,14 +95,12 @@ export const VehicleCargoForm: React.FC<VehicleCargoFormProps> = ({
   const [newItemWeight, setNewItemWeight] = useState<number>(50);
   const [newItemNotes, setNewItemNotes] = useState('');
 
-  // Auto update when initialManifest changes from parent
   useEffect(() => {
     if (initialManifest) {
       setManifest(initialManifest);
     }
   }, [initialManifest]);
 
-  // Recalculate totals whenever items change
   const updateManifestWithTotals = (updatedItems: CargoItem[]) => {
     const totalCount = updatedItems.reduce((acc, it) => acc + (Number(it.quantity) || 0), 0);
     const totalWeight = updatedItems.reduce((acc, it) => acc + (Number(it.weightKg) || 0), 0);
@@ -127,7 +133,6 @@ export const VehicleCargoForm: React.FC<VehicleCargoFormProps> = ({
     const newItems = [...manifest.items, newItem];
     updateManifestWithTotals(newItems);
 
-    // Reset input
     setNewItemName('');
     setNewItemNotes('');
   };
@@ -151,349 +156,347 @@ export const VehicleCargoForm: React.FC<VehicleCargoFormProps> = ({
   };
 
   return (
-    <div className="flex flex-col gap-5">
+    <Card>
       {/* Header Info */}
-      <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-        <div className="flex items-center gap-2">
-          <div className="p-2 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
-            <Package className="w-5 h-5" />
+      <CardHeader className="p-5 pb-4 border-b border-border flex flex-row items-center justify-between space-y-0">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-muted border border-border text-foreground">
+            <Package className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              Manifes Muatan & Barang Bawaan
-            </h3>
-            <p className="text-[11px] text-slate-400">
-              Plat Terhubung: <span className="font-mono font-bold text-cyan-300">{plateNumber || '-'}</span>
+            <CardTitle className="text-sm font-semibold">
+              Manifes Muatan Kendaraan
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Plat Terhubung: <span className="font-mono font-bold text-foreground">{plateNumber || '-'}</span>
             </p>
           </div>
         </div>
 
         {onOpenGatePassSlip && (
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={() => onOpenGatePassSlip(manifest)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-semibold shadow-md shadow-cyan-600/20 transition cursor-pointer"
+            className="text-xs gap-1.5 h-8"
           >
             <Printer className="w-3.5 h-3.5" />
-            <span>Cetak Slip Izin / Gate Pass</span>
-          </button>
+            <span>Slip Izin Masuk</span>
+          </Button>
         )}
-      </div>
+      </CardHeader>
 
-      {/* Driver & Logistics Information */}
-      <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800/80 space-y-3">
-        <div className="text-xs font-semibold text-slate-300 flex items-center gap-1.5 uppercase tracking-wider">
-          <User className="w-3.5 h-3.5 text-cyan-400" /> Data Pengemudi & Surat Jalan
+      <CardContent className="p-5 space-y-5">
+        {/* Driver & Logistics Information */}
+        <div className="space-y-3">
+          <div className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 uppercase tracking-wider">
+            <User className="w-3.5 h-3.5" /> Data Pengemudi & Surat Jalan
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                Nama Pengemudi / Sopir
+              </label>
+              <div className="relative">
+                <User className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                <Input
+                  type="text"
+                  value={manifest.driverName}
+                  onChange={(e) => handleChangeField('driverName', e.target.value)}
+                  placeholder="Contoh: Budi Santoso"
+                  className="pl-8 text-xs h-8"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                No. Kontak / HP Sopir
+              </label>
+              <div className="relative">
+                <Phone className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                <Input
+                  type="text"
+                  value={manifest.driverPhone || ''}
+                  onChange={(e) => handleChangeField('driverPhone', e.target.value)}
+                  placeholder="0812-xxxx-xxxx"
+                  className="pl-8 text-xs h-8"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                Perusahaan / Ekspedisi / Vendor
+              </label>
+              <div className="relative">
+                <Building className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                <Input
+                  type="text"
+                  value={manifest.companyName || ''}
+                  onChange={(e) => handleChangeField('companyName', e.target.value)}
+                  placeholder="Contoh: PT. Sumber Makmur Express"
+                  className="pl-8 text-xs h-8"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                No. Surat Jalan / DO / Resi
+              </label>
+              <div className="relative">
+                <FileText className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                <Input
+                  type="text"
+                  value={manifest.documentNumber || ''}
+                  onChange={(e) => handleChangeField('documentNumber', e.target.value)}
+                  placeholder="SJ-2026-XXXX"
+                  className="pl-8 text-xs h-8 font-mono font-semibold"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                Tujuan / Lokasi Bongkar
+              </label>
+              <div className="relative">
+                <MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                <Input
+                  type="text"
+                  value={manifest.destination || ''}
+                  onChange={(e) => handleChangeField('destination', e.target.value)}
+                  placeholder="Gudang A, Area Bongkar C"
+                  className="pl-8 text-xs h-8"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                No. Segel Kontainer / Box (Opsional)
+              </label>
+              <div className="relative">
+                <ShieldCheck className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                <Input
+                  type="text"
+                  value={manifest.sealNumber || ''}
+                  onChange={(e) => handleChangeField('sealNumber', e.target.value)}
+                  placeholder="SEAL-XXXX-99"
+                  className="pl-8 text-xs h-8"
+                />
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Cargo Load Status & Gate Verification */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
           <div>
-            <label className="block text-[11px] font-medium text-slate-400 mb-1">
-              Nama Pengemudi / Sopir
+            <label className="block text-[11px] font-medium text-muted-foreground mb-1.5">
+              Status Kapasitas Muatan
             </label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
-              <input
-                type="text"
-                value={manifest.driverName}
-                onChange={(e) => handleChangeField('driverName', e.target.value)}
-                placeholder="Contoh: Budi Santoso"
-                className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition"
-              />
-            </div>
+            <select
+              value={manifest.loadStatus}
+              onChange={(e) => handleChangeField('loadStatus', e.target.value as any)}
+              className="flex h-9 w-full rounded-md border border-input bg-card px-3 py-1 text-xs text-foreground shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer"
+            >
+              <option value="Penuh (Full Load)">🚚 Penuh (Full Load)</option>
+              <option value="Parsial (Half Load)">📦 Parsial / Sebagian (Half Load)</option>
+              <option value="Kosong (Empty)">⚪ Kendaraan Kosong (Empty)</option>
+              <option value="Muatan Khusus / B3">⚠️ Muatan Khusus / Bahan Berbahaya (B3)</option>
+            </select>
           </div>
 
           <div>
-            <label className="block text-[11px] font-medium text-slate-400 mb-1">
-              No. Kontak / HP Sopir
+            <label className="block text-[11px] font-medium text-muted-foreground mb-1.5">
+              Hasil Pemeriksaan Fisik Gerbang
             </label>
-            <div className="relative">
-              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
-              <input
-                type="text"
-                value={manifest.driverPhone || ''}
-                onChange={(e) => handleChangeField('driverPhone', e.target.value)}
-                placeholder="0812-xxxx-xxxx"
-                className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-medium text-slate-400 mb-1">
-              Perusahaan / Ekspedisi / Vendor
-            </label>
-            <div className="relative">
-              <Building className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
-              <input
-                type="text"
-                value={manifest.companyName || ''}
-                onChange={(e) => handleChangeField('companyName', e.target.value)}
-                placeholder="Contoh: PT. Sumber Makmur Express"
-                className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-medium text-slate-400 mb-1">
-              No. Surat Jalan / DO / Resi
-            </label>
-            <div className="relative">
-              <FileText className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
-              <input
-                type="text"
-                value={manifest.documentNumber || ''}
-                onChange={(e) => handleChangeField('documentNumber', e.target.value)}
-                placeholder="SJ-2026-XXXX"
-                className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-cyan-300 font-mono placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-medium text-slate-400 mb-1">
-              Tujuan / Lokasi Bongkar
-            </label>
-            <div className="relative">
-              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
-              <input
-                type="text"
-                value={manifest.destination || ''}
-                onChange={(e) => handleChangeField('destination', e.target.value)}
-                placeholder="Gudang A, Lantai 2, Area Bongkar C"
-                className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-medium text-slate-400 mb-1">
-              No. Segel Kontainer / Box (Opsional)
-            </label>
-            <div className="relative">
-              <ShieldCheck className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
-              <input
-                type="text"
-                value={manifest.sealNumber || ''}
-                onChange={(e) => handleChangeField('sealNumber', e.target.value)}
-                placeholder="SEAL-XXXX-99"
-                className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition"
-              />
-            </div>
+            <select
+              value={manifest.inspectionStatus}
+              onChange={(e) => handleChangeField('inspectionStatus', e.target.value as any)}
+              className="flex h-9 w-full rounded-md border border-input bg-card px-3 py-1 text-xs font-semibold text-foreground shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer"
+            >
+              <option value="Sesuai (Approved)">✅ Sesuai (Approved / Lolos Masuk)</option>
+              <option value="Perlu Cek Fisik">🔍 Perlu Pemeriksaan Fisik Tambahan</option>
+              <option value="Dalam Pemeriksaan">⏳ Sedang Dalam Pemeriksaan</option>
+              <option value="Ditolak (Rejected)">❌ Ditolak / Dilarang Masuk</option>
+            </select>
           </div>
         </div>
-      </div>
 
-      {/* Cargo Load Status & Gate Verification */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-950/60 p-4 rounded-xl border border-slate-800/80">
-        <div>
-          <label className="block text-[11px] font-semibold text-slate-300 mb-1.5">
-            Status Kapasitas Muatan Kendaraan
-          </label>
-          <select
-            value={manifest.loadStatus}
-            onChange={(e) => handleChangeField('loadStatus', e.target.value as any)}
-            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-xs text-white font-medium focus:outline-none focus:border-cyan-500 transition cursor-pointer"
-          >
-            <option value="Penuh (Full Load)">🚚 Penuh (Full Load)</option>
-            <option value="Parsial (Half Load)">📦 Parsial / Sebagian (Half Load)</option>
-            <option value="Kosong (Empty)">⚪ Kendaraan Kosong (Empty)</option>
-            <option value="Muatan Khusus / B3">⚠️ Muatan Khusus / Bahan Berbahaya (B3)</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-[11px] font-semibold text-slate-300 mb-1.5">
-            Hasil Pemeriksaan Fisik Gerbang
-          </label>
-          <select
-            value={manifest.inspectionStatus}
-            onChange={(e) => handleChangeField('inspectionStatus', e.target.value as any)}
-            className={`w-full px-3 py-2 rounded-lg border text-xs font-bold focus:outline-none transition cursor-pointer ${
-              manifest.inspectionStatus === 'Sesuai (Approved)'
-                ? 'bg-emerald-950/50 border-emerald-500/40 text-emerald-300'
-                : manifest.inspectionStatus === 'Perlu Cek Fisik'
-                ? 'bg-amber-950/50 border-amber-500/40 text-amber-300'
-                : manifest.inspectionStatus === 'Ditolak (Rejected)'
-                ? 'bg-rose-950/50 border-rose-500/40 text-rose-300'
-                : 'bg-slate-900 border-slate-800 text-slate-200'
-            }`}
-          >
-            <option value="Sesuai (Approved)">✅ Sesuai (Approved / Lolos Masuk)</option>
-            <option value="Perlu Cek Fisik">🔍 Perlu Pemeriksaan Fisik Tambahan</option>
-            <option value="Dalam Pemeriksaan">⏳ Sedang Dalam Pemeriksaan</option>
-            <option value="Ditolak (Rejected)">❌ Ditolak / Dilarang Masuk</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Itemized Goods List */}
-      <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800/80 space-y-3">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-white flex items-center gap-1.5">
-            <Layers className="w-4 h-4 text-cyan-400" /> Rincian Daftar Barang Bawaan & Muatan (
-            {manifest.items.length} Item)
-          </span>
-          <div className="flex items-center gap-3 text-[11px] font-mono">
-            <span className="text-slate-400">
-              Total Kuantitas: <span className="text-cyan-300 font-bold">{manifest.totalItemsCount || 0}</span>
+        {/* Itemized Goods List */}
+        <div className="space-y-3 pt-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5 text-muted-foreground" /> Rincian Muatan ({manifest.items.length} Item)
             </span>
-            <span className="text-slate-700">|</span>
-            <span className="text-slate-400">
-              Total Berat: <span className="text-emerald-400 font-bold">{manifest.totalWeightKg || 0} Kg</span>
-            </span>
+            <div className="flex items-center gap-2 text-[11px] font-mono">
+              <span className="text-muted-foreground">
+                Qty: <span className="text-foreground font-bold">{manifest.totalItemsCount || 0}</span>
+              </span>
+              <span className="text-border">|</span>
+              <span className="text-muted-foreground">
+                Berat: <span className="text-foreground font-bold">{manifest.totalWeightKg || 0} Kg</span>
+              </span>
+            </div>
           </div>
+
+          {/* Add New Item Mini-Form */}
+          <form onSubmit={handleAddItem} className="bg-muted/40 p-3 rounded-lg border border-border space-y-2">
+            <div className="text-[11px] font-semibold text-foreground flex items-center gap-1">
+              <Plus className="w-3 h-3" /> Tambah Item Muatan
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+              <div className="sm:col-span-4">
+                <Input
+                  type="text"
+                  value={newItemName}
+                  onChange={(e) => setNewItemName(e.target.value)}
+                  placeholder="Nama Barang (misal: Beras 10kg)"
+                  className="text-xs h-8"
+                />
+              </div>
+              <div className="sm:col-span-3">
+                <select
+                  value={newItemCategory}
+                  onChange={(e) => setNewItemCategory(e.target.value)}
+                  className="flex h-8 w-full rounded-md border border-input bg-card px-2 py-1 text-xs text-foreground shadow-sm focus-visible:outline-none"
+                >
+                  {CARGO_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="sm:col-span-2 flex gap-1">
+                <Input
+                  type="number"
+                  min="1"
+                  value={newItemQty}
+                  onChange={(e) => setNewItemQty(Number(e.target.value))}
+                  placeholder="Qty"
+                  className="text-xs h-8 text-center"
+                />
+                <select
+                  value={newItemUnit}
+                  onChange={(e) => setNewItemUnit(e.target.value)}
+                  className="flex h-8 w-full rounded-md border border-input bg-card px-1 py-1 text-xs text-foreground shadow-sm focus-visible:outline-none"
+                >
+                  {CARGO_UNITS.map((u) => (
+                    <option key={u} value={u}>
+                      {u}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="sm:col-span-2">
+                <Input
+                  type="number"
+                  min="0"
+                  value={newItemWeight}
+                  onChange={(e) => setNewItemWeight(Number(e.target.value))}
+                  placeholder="Kg"
+                  className="text-xs h-8"
+                  title="Berat Total (Kg)"
+                />
+              </div>
+              <div className="sm:col-span-1">
+                <Button
+                  type="submit"
+                  size="sm"
+                  className="w-full h-8 p-0"
+                  title="Tambah Item"
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+            <div>
+              <Input
+                type="text"
+                value={newItemNotes}
+                onChange={(e) => setNewItemNotes(e.target.value)}
+                placeholder="Catatan tambahan (opsional: Segel Utuh, Fragile, Batch #23)"
+                className="text-[11px] h-7"
+              />
+            </div>
+          </form>
+
+          {/* Items Table */}
+          {manifest.items.length > 0 ? (
+            <div className="rounded-md border border-border">
+              <Table>
+                <TableHeader>
+                  <TableRow className="text-[11px] hover:bg-transparent">
+                    <TableHead className="h-8">Barang</TableHead>
+                    <TableHead className="h-8">Kategori</TableHead>
+                    <TableHead className="h-8 text-center">Jumlah</TableHead>
+                    <TableHead className="h-8 text-right">Berat</TableHead>
+                    <TableHead className="h-8">Catatan</TableHead>
+                    <TableHead className="h-8 text-right">Aksi</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {manifest.items.map((item) => (
+                    <TableRow key={item.id} className="text-xs">
+                      <TableCell className="font-medium">{item.name}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-[10px] font-normal">
+                          {item.category}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center font-mono">
+                        {item.quantity} {item.unit}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {item.weightKg ? `${item.weightKg.toLocaleString()} Kg` : '-'}
+                      </TableCell>
+                      <TableCell className="text-[11px] text-muted-foreground">
+                        {item.notes || '-'}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="iconSm"
+                          onClick={() => handleRemoveItem(item.id)}
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                          title="Hapus item"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <div className="p-4 rounded-md bg-muted/20 border border-dashed border-border text-center text-muted-foreground text-xs">
+              Belum ada rincian muatan yang dicatat.
+            </div>
+          )}
         </div>
 
-        {/* Add New Item Mini-Form */}
-        <form onSubmit={handleAddItem} className="bg-slate-900/90 p-3 rounded-lg border border-slate-800 space-y-2">
-          <div className="text-[11px] font-semibold text-cyan-400 flex items-center gap-1">
-            <Plus className="w-3.5 h-3.5" /> Tambah Barang Bawaan Baru
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
-            <div className="sm:col-span-4">
-              <input
-                type="text"
-                value={newItemName}
-                onChange={(e) => setNewItemName(e.target.value)}
-                placeholder="Nama Barang (contoh: Beras 10kg, Kabel Roll)"
-                className="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
-              />
-            </div>
-            <div className="sm:col-span-3">
-              <select
-                value={newItemCategory}
-                onChange={(e) => setNewItemCategory(e.target.value)}
-                className="w-full px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-300 focus:outline-none focus:border-cyan-500"
-              >
-                {CARGO_CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="sm:col-span-2 flex gap-1">
-              <input
-                type="number"
-                min="1"
-                value={newItemQty}
-                onChange={(e) => setNewItemQty(Number(e.target.value))}
-                placeholder="Jumlah"
-                className="w-16 px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white text-center focus:outline-none focus:border-cyan-500"
-              />
-              <select
-                value={newItemUnit}
-                onChange={(e) => setNewItemUnit(e.target.value)}
-                className="w-full px-1.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-300 focus:outline-none focus:border-cyan-500"
-              >
-                {CARGO_UNITS.map((u) => (
-                  <option key={u} value={u}>
-                    {u}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="sm:col-span-2">
-              <input
-                type="number"
-                min="0"
-                value={newItemWeight}
-                onChange={(e) => setNewItemWeight(Number(e.target.value))}
-                placeholder="Est. Kg"
-                className="w-full px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
-                title="Estimasi Berat Total dalam Kg"
-              />
-            </div>
-            <div className="sm:col-span-1">
-              <button
-                type="submit"
-                className="w-full h-full min-h-[30px] rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center justify-center transition shadow shadow-cyan-600/20 cursor-pointer"
-                title="Tambahkan Barang"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-          <div className="grid grid-cols-1">
-            <input
-              type="text"
-              value={newItemNotes}
-              onChange={(e) => setNewItemNotes(e.target.value)}
-              placeholder="Catatan khusus barang (opsional, contoh: Fragile, Batch #23, Segel Utuh)"
-              className="w-full px-2.5 py-1 rounded bg-slate-950/70 border border-slate-800/80 text-[11px] text-slate-300 placeholder-slate-600 focus:outline-none focus:border-cyan-500"
-            />
-          </div>
-        </form>
-
-        {/* Items Table / List */}
-        {manifest.items.length > 0 ? (
-          <div className="overflow-x-auto rounded-lg border border-slate-800">
-            <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-slate-900 text-slate-400 text-[10px] uppercase tracking-wider border-b border-slate-800">
-                <tr>
-                  <th className="py-2 px-3">Barang</th>
-                  <th className="py-2 px-3">Kategori</th>
-                  <th className="py-2 px-3 text-center">Jumlah</th>
-                  <th className="py-2 px-3 text-right">Est. Berat</th>
-                  <th className="py-2 px-3">Catatan</th>
-                  <th className="py-2 px-3 text-right">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60 bg-slate-950/40">
-                {manifest.items.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-800/30 transition">
-                    <td className="py-2 px-3 font-semibold text-white">{item.name}</td>
-                    <td className="py-2 px-3">
-                      <span className="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300 border border-slate-700">
-                        {item.category}
-                      </span>
-                    </td>
-                    <td className="py-2 px-3 text-center font-mono font-bold text-cyan-300">
-                      {item.quantity} {item.unit}
-                    </td>
-                    <td className="py-2 px-3 text-right font-mono text-emerald-400">
-                      {item.weightKg ? `${item.weightKg.toLocaleString()} Kg` : '-'}
-                    </td>
-                    <td className="py-2 px-3 text-[11px] text-slate-400 italic">
-                      {item.notes || '-'}
-                    </td>
-                    <td className="py-2 px-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveItem(item.id)}
-                        className="p-1 rounded hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 transition cursor-pointer"
-                        title="Hapus barang ini"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="p-4 rounded-lg bg-slate-900/50 border border-dashed border-slate-800 text-center text-slate-500 text-xs">
-            Belum ada rincian barang bawaan yang ditambahkan. Gunakan formulir di atas untuk mencatat barang atau muatan.
-          </div>
-        )}
-      </div>
-
-      {/* Inspector Notes */}
-      <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800/80">
-        <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
-          <Info className="w-3.5 h-3.5 text-cyan-400" /> Catatan Tambahan Petugas Gerbang / Pemeriksa
-        </label>
-        <textarea
-          rows={2}
-          value={manifest.inspectorNotes || ''}
-          onChange={(e) => handleChangeField('inspectorNotes', e.target.value)}
-          placeholder="Tuliskan catatan kondisi kendaraan, kecocokan dokumen fisik, atau instruksi khusus..."
-          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition"
-        />
-      </div>
-    </div>
+        {/* Inspector Notes */}
+        <div className="pt-2">
+          <label className="block text-xs font-semibold text-muted-foreground mb-1.5 flex items-center gap-1.5">
+            <Info className="w-3.5 h-3.5" /> Catatan Petugas Gerbang
+          </label>
+          <Textarea
+            rows={2}
+            value={manifest.inspectorNotes || ''}
+            onChange={(e) => handleChangeField('inspectorNotes', e.target.value)}
+            placeholder="Tuliskan catatan kondisi fisik kendaraan atau instruksi khusus..."
+            className="text-xs"
+          />
+        </div>
+      </CardContent>
+    </Card>
   );
 };

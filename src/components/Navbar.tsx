@@ -2,7 +2,6 @@
 
 import React from 'react';
 import {
-  Car,
   Package,
   Database,
   History,
@@ -11,8 +10,9 @@ import {
   Volume2,
   VolumeX,
   ScanLine,
-  Truck,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 export type ActiveTab = 'inspect' | 'manifest' | 'dataset' | 'history';
 
@@ -38,81 +38,76 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAccessManager,
 }) => {
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-slate-800 bg-slate-950/85 backdrop-blur-md">
+    <header className="sticky top-0 z-40 w-full border-b border-border/80 bg-background/90 backdrop-blur-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex items-center justify-between h-14">
           {/* Logo & Brand */}
           <div className="flex items-center gap-3">
-            <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 via-blue-600 to-indigo-600 shadow-lg shadow-cyan-500/20">
-              <span className="font-mono font-black text-white text-lg tracking-tighter">ID</span>
-              <div className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-slate-950 animate-ping" />
-              <div className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-slate-950" />
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary text-primary-foreground font-mono font-black text-sm tracking-tight shadow-sm">
+              ALPR
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-lg font-bold tracking-tight text-white">
-                  ALPR<span className="text-cyan-400">Cargo</span>
+                <span className="text-sm font-semibold tracking-tight text-foreground">
+                  Cargo<span className="text-muted-foreground font-normal">Vision</span>
                 </span>
-                <span className="px-2 py-0.5 text-[10px] font-bold tracking-wider text-cyan-300 bg-cyan-950/80 border border-cyan-800/60 rounded-full uppercase">
-                  Logistics AI
-                </span>
+                <Badge variant="outline" className="text-[10px] py-0 px-1.5 font-mono text-muted-foreground">
+                  v2.0
+                </Badge>
               </div>
-              <p className="text-[11px] text-slate-400 hidden sm:block">
-                Deteksi Plat & Manifes Muatan Kendaraan
-              </p>
             </div>
           </div>
 
-          {/* Navigation Tabs */}
-          <nav className="flex items-center gap-1 sm:gap-1.5 p-1 bg-slate-900/90 border border-slate-800 rounded-xl shadow-inner">
+          {/* Navigation Tabs (Shadcn style segmented control) */}
+          <nav className="flex items-center gap-1 p-1 bg-muted rounded-lg border border-border/50 text-muted-foreground">
             <button
               onClick={() => setActiveTab('inspect')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${
                 activeTab === 'inspect'
-                  ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md shadow-cyan-500/25'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  ? 'bg-background text-foreground shadow-sm font-semibold'
+                  : 'hover:text-foreground hover:bg-background/40'
               }`}
             >
-              <ScanLine className="w-4 h-4" />
-              <span className="hidden md:inline">Inspeksi & Deteksi</span>
+              <ScanLine className="w-3.5 h-3.5" />
+              <span>Inspeksi Plat</span>
             </button>
 
             <button
               onClick={() => setActiveTab('manifest')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${
                 activeTab === 'manifest'
-                  ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md shadow-cyan-500/25'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  ? 'bg-background text-foreground shadow-sm font-semibold'
+                  : 'hover:text-foreground hover:bg-background/40'
               }`}
             >
-              <Package className="w-4 h-4" />
-              <span className="hidden md:inline">Manifes Muatan</span>
+              <Package className="w-3.5 h-3.5" />
+              <span>Manifes Muatan</span>
             </button>
 
             <button
               onClick={() => setActiveTab('dataset')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${
                 activeTab === 'dataset'
-                  ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md shadow-cyan-500/25'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  ? 'bg-background text-foreground shadow-sm font-semibold'
+                  : 'hover:text-foreground hover:bg-background/40'
               }`}
             >
-              <Database className="w-4 h-4" />
-              <span className="hidden md:inline">Dataset Tester</span>
+              <Database className="w-3.5 h-3.5" />
+              <span>Dataset Tester</span>
             </button>
 
             <button
               onClick={() => setActiveTab('history')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${
                 activeTab === 'history'
-                  ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md shadow-cyan-500/25'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  ? 'bg-background text-foreground shadow-sm font-semibold'
+                  : 'hover:text-foreground hover:bg-background/40'
               }`}
             >
-              <History className="w-4 h-4" />
-              <span className="hidden md:inline">Riwayat</span>
+              <History className="w-3.5 h-3.5" />
+              <span>Riwayat</span>
               {historyCount > 0 && (
-                <span className="px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-cyan-500/30 text-cyan-300">
+                <span className="ml-0.5 px-1.5 py-0.2 text-[10px] font-semibold rounded-full bg-secondary text-secondary-foreground">
                   {historyCount}
                 </span>
               )}
@@ -122,44 +117,42 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Quick Actions & Status */}
           <div className="flex items-center gap-2">
             {/* Whitelist Manager Button */}
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={onOpenAccessManager}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 bg-slate-900 border border-slate-800 hover:border-slate-700 hover:text-white transition cursor-pointer shadow-sm"
-              title="Kelola Akses Kendaraan (Whitelist / Blacklist)"
+              className="h-8 gap-1.5 text-xs font-medium"
             >
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span className="hidden lg:inline">Kelola Akses</span>
-            </button>
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="hidden sm:inline">Kelola Akses</span>
+            </Button>
 
             {/* Sound Toggle */}
-            <button
+            <Button
+              variant="ghost"
+              size="iconSm"
               onClick={() => setSoundEnabled(!soundEnabled)}
-              className={`p-2 rounded-xl border transition cursor-pointer ${
-                soundEnabled
-                  ? 'bg-slate-900 border-slate-800 text-cyan-400 hover:bg-slate-800'
-                  : 'bg-slate-900/50 border-slate-800/50 text-slate-500 hover:text-slate-400'
-              }`}
-              title={soundEnabled ? 'Suara Beep Aktif' : 'Suara Beep Nonaktif'}
+              title={soundEnabled ? 'Suara Aktif' : 'Suara Nonaktif'}
+              className="text-muted-foreground hover:text-foreground"
             >
-              {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-            </button>
+              {soundEnabled ? <Volume2 className="w-4 h-4 text-primary" /> : <VolumeX className="w-4 h-4 text-muted-foreground" />}
+            </Button>
 
-            {/* Engine Status Badge */}
-            <div className="hidden xl:flex items-center gap-3 px-3 py-1 rounded-xl bg-slate-900 border border-slate-800 text-xs">
-              <div className="flex items-center gap-1.5">
-                <Cpu className="w-3.5 h-3.5 text-cyan-400" />
-                <span className="text-slate-400">OCR:</span>
+            {/* AI Engine Status Badges */}
+            <div className="hidden lg:flex items-center gap-2 pl-2 border-l border-border text-xs">
+              <Badge variant="outline" className="gap-1 font-mono text-[11px] py-0.5">
+                <Cpu className="w-3 h-3 text-muted-foreground" />
+                <span className="text-muted-foreground">OCR:</span>
                 <span className={ocrReady ? 'text-emerald-400 font-medium' : 'text-amber-400 animate-pulse'}>
                   {ocrReady ? 'Ready' : 'Init...'}
                 </span>
-              </div>
-              <span className="text-slate-700">|</span>
-              <div className="flex items-center gap-1.5">
-                <span className="text-slate-400">YOLO:</span>
-                <span className={onnxReady ? 'text-emerald-400 font-medium' : 'text-slate-400'}>
-                  {onnxReady ? 'ONNX Active' : 'CV Filter'}
+              </Badge>
+              <Badge variant="outline" className="font-mono text-[11px] py-0.5">
+                <span className="text-muted-foreground">AI: </span>
+                <span className={onnxReady ? 'text-emerald-400 font-medium' : 'text-muted-foreground'}>
+                  {onnxReady ? 'YOLO v8' : 'CV Filter'}
                 </span>
-              </div>
+              </Badge>
             </div>
           </div>
         </div>

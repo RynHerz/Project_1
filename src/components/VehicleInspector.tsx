@@ -1,34 +1,26 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Upload,
   Camera,
   Image as ImageIcon,
-  Video as VideoIcon,
   Play,
   RefreshCw,
-  Sparkles,
-  CheckCircle2,
   FileCheck,
-  Eye,
-  Sliders,
-  ShieldCheck,
-  Package,
-  Printer,
   Edit3,
-  Car,
-  Truck,
-  PlusCircle,
-  Clock,
   Layers,
   ChevronRight,
-  Save,
+  Check,
+  Copy,
 } from 'lucide-react';
 import { DetectionResult, WhitelistRule, VehicleCargoManifest } from '../lib/alpr/types';
 import { runAlprPipelineMulti } from '../lib/alpr/pipeline';
-import { DEMO_SAMPLES, DemoSample, createDefaultCargoManifest } from '../lib/alpr/sampleData';
 import { VehicleCargoForm } from './VehicleCargoForm';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 
 interface VehicleInspectorProps {
   onNewDetection: (result: DetectionResult) => void;
@@ -55,6 +47,7 @@ export const VehicleInspector: React.FC<VehicleInspectorProps> = ({
   // Manual plate editing state
   const [isEditingPlate, setIsEditingPlate] = useState<boolean>(false);
   const [manualPlateText, setManualPlateText] = useState<string>('');
+  const [copied, setCopied] = useState<boolean>(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const cameraCaptureInputRef = useRef<HTMLInputElement | null>(null);
@@ -87,105 +80,63 @@ export const VehicleInspector: React.FC<VehicleInspectorProps> = ({
     setIsEditingPlate(false);
   };
 
-  // Handle selecting built-in demo sample
-  const handleSelectSample = (sample: DemoSample) => {
-    setFileUrl(sample.dataUrl);
-    setSelectedFileType('image');
-    setDetectedResults([]);
-    setSelectedVehicleIndex(0);
-    setStatusMessage(null);
-    setIsEditingPlate(false);
-  };
-
   // Draw bounding boxes over image when results change
-  useEffect(() => {
+  const drawBoundingBoxes = (results: DetectionResult[], imgEl: HTMLImageElement) => {
     const canvas = overlayCanvasRef.current;
-    const img = imageElementRef.current;
-    if (!canvas || !img || detectedResults.length === 0) {
-      if (canvas) {
-        const ctx = canvas.getContext('2d');
-        ctx?.clearRect(0, 0, canvas.width, canvas.height);
-      }
-      return;
-    }
+    if (!canvas || !imgEl) return;
 
-    canvas.width = img.naturalWidth || img.width;
-    canvas.height = img.naturalHeight || img.height;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    canvas.width = imgEl.naturalWidth || imgEl.width;
+    canvas.height = imgEl.naturalHeight || imgEl.height;
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    detectedResults.forEach((res, idx) => {
+    results.forEach((res, idx) => {
       const isSelected = idx === selectedVehicleIndex;
-      const b = res.bbox;
+      const { x, y, width, height } = res.bbox;
 
-      // Box border
-      ctx.lineWidth = isSelected ? 4 : 2.5;
-      ctx.strokeStyle = isSelected ? '#06b6d4' : '#3b82f6';
-      ctx.fillStyle = isSelected ? 'rgba(6, 182, 212, 0.20)' : 'rgba(59, 130, 246, 0.10)';
+      ctx.lineWidth = isSelected ? 4 : 2;
+      ctx.strokeStyle = isSelected ? '#38bdf8' : '#22c55e';
+      ctx.strokeRect(x, y, width, height);
 
-      ctx.beginPath();
-      ctx.roundRect(b.x, b.y, b.width, b.height, 6);
-      ctx.fill();
-      ctx.stroke();
-
-      // Label background & text
-      const label = `#${idx + 1}: ${res.formattedPlate}`;
+      // Label background
+      ctx.fillStyle = isSelected ? 'rgba(14, 165, 233, 0.9)' : 'rgba(22, 101, 52, 0.9)';
+      const labelText = `#${idx + 1} ${res.formattedPlate}`;
       ctx.font = 'bold 16px monospace';
-      const textWidth = ctx.measureText(label).width;
+      const textWidth = ctx.measureText(labelText).width;
 
-      ctx.fillStyle = isSelected ? '#0891b2' : '#1e3a8a';
-      ctx.beginPath();
-      ctx.roundRect(b.x, Math.max(0, b.y - 26), textWidth + 16, 24, 4);
-      ctx.fill();
+      const labelHeight = 26;
+      const labelY = y > labelHeight ? y - labelHeight : y;
+      ctx.fillRect(x, labelY, textWidth + 14, labelHeight);
 
       ctx.fillStyle = '#ffffff';
-      ctx.fillText(label, b.x + 8, Math.max(16, b.y - 8));
+      ctx.fillText(labelText, x + 7, labelY + 18);
     });
-  }, [detectedResults, selectedVehicleIndex]);
+  };
 
-  // Run multi-plate detection on current loaded image
+  // Run full detection pipeline on loaded image
   const processImage = async () => {
     if (!imageElementRef.current) return;
     setIsProcessing(true);
-    setStatusMessage('Memindai seluruh kendaraan & plat nomor dalam foto...');
+    setStatusMessage('Memindai seluruh kendaraan & plat dalam foto...');
 
     try {
       const results = await runAlprPipelineMulti(imageElementRef.current, whitelistRules, soundEnabled);
-
-      // Match demo manifests if available
-      const enrichedResults: DetectionResult[] = results.map((result) => {
-        const matchedSample = DEMO_SAMPLES.find(
-          (s) => s.plate.replace(/\s+/g, '') === result.plateNumber.replace(/\s+/g, '')
-        );
-
-        const manifest =
-          matchedSample?.defaultManifest ||
-          createDefaultCargoManifest(result.formattedPlate, matchedSample?.name);
-
-        return {
-          ...result,
-          vehicleType: matchedSample?.vehicle || result.vehicleType || 'Mobil',
-          cargoManifest: manifest,
-        };
-      });
-
-      setDetectedResults(enrichedResults);
+      setDetectedResults(results);
       setSelectedVehicleIndex(0);
-      setManualPlateText(enrichedResults[0]?.formattedPlate || '');
+      setManualPlateText(results[0]?.formattedPlate || '');
 
-      // Send each detected vehicle to history log
-      enrichedResults.forEach((res) => {
+      results.forEach((res) => {
         onNewDetection(res);
       });
 
-      setStatusMessage(
-        `Sukses! Berhasil mendeteksi ${enrichedResults.length} plat kendaraan dalam ${enrichedResults[0]?.processingTimeMs || 0} ms.`
-      );
+      drawBoundingBoxes(results, imageElementRef.current);
+      setStatusMessage(`Selesai: ${results.length} kendaraan/plat nomor teridentifikasi.`);
     } catch (err: any) {
       console.error(err);
-      setStatusMessage('Gagal mendeteksi plat: ' + (err.message || 'Error tidak diketahui'));
+      setStatusMessage('Gagal menganalisis gambar. Coba lagi dengan pencahayaan yang lebih baik.');
     } finally {
       setIsProcessing(false);
     }
@@ -248,382 +199,378 @@ export const VehicleInspector: React.FC<VehicleInspectorProps> = ({
     onNewDetection(updatedResult);
   };
 
+  const handleCopyPlate = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
     <div className="flex flex-col gap-6">
-      {/* Top Banner */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900 to-cyan-950/40 border border-slate-800 p-5 shadow-xl">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 uppercase tracking-wider">
-                Multi-Vehicle Checkpoint
-              </span>
-              <span className="text-xs text-slate-400 font-mono">
-                Multi-Plate AI Scanner + Cargo Manifest
-              </span>
-            </div>
-            <h2 className="text-lg sm:text-xl font-black text-white tracking-tight">
-              Inspeksi Kendaraan, Deteksi Multi-Plat & Manajemen Muatan
-            </h2>
-            <p className="text-xs text-slate-400 max-w-2xl">
-              Mampu mendeteksi **banyak kendaraan / motor sekaligus** dalam satu foto, memeriksa status akses gerbang, dan menginput dokumen muatan masing-masing kendaraan.
-            </p>
-          </div>
+      {/* Hidden file & camera inputs */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,video/*"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+      <input
+        ref={cameraCaptureInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleFileChange}
+        className="hidden"
+      />
 
-          {/* Quick Action Buttons */}
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <button
-              onClick={() => cameraCaptureInputRef.current?.click()}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold shadow-lg shadow-cyan-500/25 transition cursor-pointer"
-            >
-              <Camera className="w-4 h-4" />
-              <span>Foto Langsung (Kamera HP)</span>
-            </button>
-
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition cursor-pointer"
-            >
-              <Upload className="w-4 h-4 text-cyan-400" />
-              <span>Upload Foto Kendaraan</span>
-            </button>
-          </div>
+      {/* Clean Top Action Toolbar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-foreground">
+            Inspeksi Plat & Muatan Kendaraan
+          </h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Sistem pengenalan plat multi-kendaraan dengan integrasi manifes logistik.
+          </p>
         </div>
 
-        {/* Hidden inputs */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*,video/*"
-          onChange={handleFileChange}
-          className="hidden"
-        />
-        <input
-          ref={cameraCaptureInputRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          onChange={handleFileChange}
-          className="hidden"
-        />
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => cameraCaptureInputRef.current?.click()}
+            size="sm"
+            className="gap-2 text-xs font-semibold"
+          >
+            <Camera className="w-3.5 h-3.5" />
+            <span>Foto Kamera</span>
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fileInputRef.current?.click()}
+            className="gap-2 text-xs font-medium"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            <span>Upload Foto</span>
+          </Button>
+        </div>
       </div>
 
-      {/* Main Grid */}
+      {/* Main Two-Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Media & Detection Selector */}
+        {/* Left Column: Media Preview & Vehicle Selection */}
         <div className="lg:col-span-5 flex flex-col gap-4">
-          {/* Media Container */}
-          <div className="relative overflow-hidden rounded-2xl bg-slate-900 border border-slate-800 p-4 sm:p-5 shadow-xl flex flex-col items-center justify-center min-h-[340px]">
-            {fileUrl ? (
-              <div className="relative w-full flex flex-col items-center">
-                {selectedFileType === 'image' ? (
-                  <div className="relative max-h-[380px] w-full rounded-xl overflow-hidden border border-slate-800 bg-slate-950 flex items-center justify-center">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      ref={imageElementRef}
-                      src={fileUrl}
-                      alt="Preview kendaraan"
-                      onLoad={processImage}
-                      className="max-h-[360px] w-auto object-contain rounded-lg"
-                    />
+          {/* Media Card */}
+          <Card className="overflow-hidden">
+            <CardContent className="p-4 flex flex-col items-center justify-center min-h-[320px]">
+              {fileUrl ? (
+                <div className="relative w-full flex flex-col items-center">
+                  {selectedFileType === 'image' ? (
+                    <div className="relative max-h-[360px] w-full rounded-lg overflow-hidden border border-border bg-black/40 flex items-center justify-center">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        ref={imageElementRef}
+                        src={fileUrl}
+                        alt="Preview kendaraan"
+                        onLoad={processImage}
+                        className="max-h-[340px] w-auto object-contain rounded-md"
+                      />
 
-                    {/* Canvas overlay for multi-plate bounding boxes */}
-                    <canvas
-                      ref={overlayCanvasRef}
-                      className="absolute inset-0 w-full h-full object-contain pointer-events-none"
-                    />
+                      {/* Canvas overlay for multi-plate bounding boxes */}
+                      <canvas
+                        ref={overlayCanvasRef}
+                        className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+                      />
 
-                    {/* Animated Scanning Overlay when processing */}
-                    {isProcessing && (
-                      <div className="absolute inset-0 bg-cyan-950/40 backdrop-blur-[1px] flex flex-col items-center justify-center">
-                        <div className="w-16 h-16 rounded-2xl border-2 border-cyan-400 animate-spin flex items-center justify-center text-cyan-400 mb-2">
-                          <RefreshCw className="w-6 h-6" />
+                      {/* Scanning spinner overlay */}
+                      {isProcessing && (
+                        <div className="absolute inset-0 bg-background/80 backdrop-blur-xs flex flex-col items-center justify-center">
+                          <div className="w-10 h-10 rounded-full border-2 border-primary border-t-transparent animate-spin mb-3" />
+                          <span className="text-xs font-mono font-medium text-foreground">
+                            Memproses OCR & Deteksi...
+                          </span>
                         </div>
-                        <span className="text-xs font-mono font-bold text-cyan-300 animate-pulse">
-                          Mencari Semua Plat Nomor...
-                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="w-full flex flex-col items-center">
+                      <video
+                        ref={videoElementRef}
+                        src={fileUrl}
+                        controls
+                        playsInline
+                        className="max-h-[340px] w-full rounded-lg border border-border bg-black/40 object-contain"
+                      />
+                      <div className="mt-3 flex items-center gap-2">
+                        <Button
+                          onClick={processVideoFrame}
+                          disabled={isProcessing}
+                          size="sm"
+                          className="gap-2 text-xs"
+                        >
+                          {isProcessing ? (
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Play className="w-3.5 h-3.5 fill-current" />
+                          )}
+                          Pindai Frame Video
+                        </Button>
                       </div>
+                    </div>
+                  )}
+
+                  {/* Media Control Toolbar */}
+                  <div className="mt-3 w-full flex items-center justify-between gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="text-xs gap-1.5 h-8"
+                    >
+                      <Upload className="w-3 h-3" /> Ganti Gambar
+                    </Button>
+
+                    {selectedFileType === 'image' && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={processImage}
+                        disabled={isProcessing}
+                        className="text-xs gap-1.5 h-8"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${isProcessing ? 'animate-spin' : ''}`} />
+                        Pindai Ulang
+                      </Button>
                     )}
                   </div>
-                ) : (
-                  <div className="w-full flex flex-col items-center">
-                    <video
-                      ref={videoElementRef}
-                      src={fileUrl}
-                      controls
-                      playsInline
-                      className="max-h-[360px] w-full rounded-xl border border-slate-800 bg-slate-950 object-contain"
-                    />
-                    <div className="mt-3 flex items-center gap-2">
-                      <button
-                        onClick={processVideoFrame}
-                        disabled={isProcessing}
-                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white text-xs font-bold shadow-lg shadow-cyan-600/30 transition flex items-center gap-2 cursor-pointer"
-                      >
-                        {isProcessing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-current" />}
-                        Pindai Frame Video Ini
-                      </button>
-                    </div>
+                </div>
+              ) : (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full border-2 border-dashed border-border hover:border-primary/50 rounded-lg p-8 text-center cursor-pointer transition bg-muted/20 hover:bg-muted/40"
+                >
+                  <div className="w-12 h-12 rounded-lg bg-muted border border-border flex items-center justify-center mx-auto mb-3 text-muted-foreground">
+                    <Upload className="w-6 h-6" />
                   </div>
-                )}
-
-                {/* Media Control Bar */}
-                <div className="mt-4 w-full flex items-center justify-between gap-2">
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Upload className="w-3.5 h-3.5" /> Ganti Foto
-                  </button>
-
-                  {selectedFileType === 'image' && (
-                    <button
-                      onClick={processImage}
-                      disabled={isProcessing}
-                      className="px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold shadow-md shadow-cyan-600/20 transition flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${isProcessing ? 'animate-spin' : ''}`} />
-                      Pindai Ulang
-                    </button>
-                  )}
+                  <h3 className="text-sm font-semibold text-foreground mb-1">
+                    Upload Foto / Video Kendaraan
+                  </h3>
+                  <p className="text-xs text-muted-foreground max-w-xs mx-auto mb-4">
+                    Mendukung deteksi tunggal maupun multi-kendaraan dalam satu tangkapan gambar.
+                  </p>
+                  <div className="flex items-center justify-center gap-2">
+                    <Button size="sm" variant="secondary" className="gap-1.5 text-xs pointer-events-none">
+                      <ImageIcon className="w-3.5 h-3.5" /> Pilih File
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full border-2 border-dashed border-slate-700 hover:border-cyan-500/60 rounded-xl p-8 text-center cursor-pointer transition bg-slate-950/40 hover:bg-slate-950/70 group"
-              >
-                <div className="w-14 h-14 rounded-2xl bg-slate-800/80 group-hover:bg-cyan-950 border border-slate-700 group-hover:border-cyan-500/40 flex items-center justify-center mx-auto mb-3 text-slate-400 group-hover:text-cyan-400 transition shadow-inner">
-                  <Upload className="w-7 h-7" />
-                </div>
-                <h3 className="text-sm font-semibold text-white mb-1">
-                  Upload Foto Kendaraan (Bisa 1 atau Banyak Kendaraan)
-                </h3>
-                <p className="text-xs text-slate-400 max-w-xs mx-auto mb-3">
-                  Pilih foto kendaraan dari galeri atau potret langsung dengan kamera HP.
-                </p>
-                <div className="flex items-center justify-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-600 text-white text-xs font-semibold shadow-md">
-                    <ImageIcon className="w-3.5 h-3.5" /> Pilih Gambar
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Multi-Vehicle Selector Tabs (If 2+ vehicles detected in photo) */}
           {detectedResults.length > 1 && (
-            <div className="rounded-2xl bg-slate-900 border border-cyan-500/30 p-4 shadow-xl space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold text-white">
-                <span className="flex items-center gap-1.5 text-cyan-400">
-                  <Layers className="w-4 h-4" /> Ditemukan {detectedResults.length} Kendaraan dalam Foto:
-                </span>
-                <span className="text-[10px] text-slate-400">Klik untuk pilih & edit muatan</span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                {detectedResults.map((res, idx) => {
-                  const isSelected = idx === selectedVehicleIndex;
-                  return (
-                    <button
-                      key={res.id || idx}
-                      onClick={() => {
-                        setSelectedVehicleIndex(idx);
-                        setManualPlateText(res.formattedPlate);
-                        setIsEditingPlate(false);
-                      }}
-                      className={`p-2.5 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
-                        isSelected
-                          ? 'bg-cyan-950/60 border-cyan-500 text-white shadow-lg shadow-cyan-500/10 ring-1 ring-cyan-500'
-                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
-                      }`}
-                    >
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                              isSelected ? 'bg-cyan-500 text-slate-950' : 'bg-slate-800 text-slate-300'
-                            }`}
-                          >
-                            #{idx + 1}
-                          </span>
-                          <span className="font-mono text-xs font-black text-white">
-                            {res.formattedPlate}
+            <Card className="border-primary/30">
+              <CardHeader className="p-3.5 pb-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-primary" />
+                    <CardTitle className="text-xs font-semibold">
+                      Ditemukan {detectedResults.length} Kendaraan dalam Foto
+                    </CardTitle>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground">Pilih untuk kelola</span>
+                </div>
+              </CardHeader>
+              <CardContent className="p-3.5 pt-0">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {detectedResults.map((res, idx) => {
+                    const isSelected = idx === selectedVehicleIndex;
+                    return (
+                      <button
+                        key={res.id || idx}
+                        onClick={() => {
+                          setSelectedVehicleIndex(idx);
+                          setManualPlateText(res.formattedPlate);
+                          setIsEditingPlate(false);
+                        }}
+                        className={`p-2.5 rounded-lg border text-left transition flex items-center justify-between cursor-pointer ${
+                          isSelected
+                            ? 'bg-accent border-primary text-foreground ring-1 ring-primary'
+                            : 'bg-card border-border text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                        }`}
+                      >
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <Badge variant={isSelected ? 'default' : 'secondary'} className="text-[10px] px-1.5 py-0">
+                              #{idx + 1}
+                            </Badge>
+                            <span className="font-mono text-xs font-bold text-foreground">
+                              {res.formattedPlate}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-muted-foreground block pl-5">
+                            {res.vehicleType || 'Kendaraan'} • {res.confidence}% Akurasi
                           </span>
                         </div>
-                        <span className="text-[10px] text-slate-400 block pl-6">
-                          {res.vehicleType || 'Kendaraan'} • {res.confidence}% Akurasi
-                        </span>
-                      </div>
-                      <ChevronRight className={`w-4 h-4 ${isSelected ? 'text-cyan-400' : 'text-slate-600'}`} />
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+                        <ChevronRight className={`w-3.5 h-3.5 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
+                      </button>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           {/* Active Plate OCR Result Card */}
           {activeResult && (
-            <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 shadow-xl space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                  <FileCheck className="w-4 h-4 text-cyan-400" /> Kendaraan Aktif:{' '}
-                  <span className="text-cyan-300 font-mono">#{selectedVehicleIndex + 1}</span>
-                </span>
-                <span className="text-[11px] font-mono text-emerald-400 font-bold">
-                  {activeResult.confidence}% Akurasi
-                </span>
-              </div>
-
-              {/* License Plate Display */}
-              <div className="relative rounded-xl border-4 border-slate-950 bg-slate-950 p-4 text-center shadow-inner">
-                {isEditingPlate ? (
+            <Card>
+              <CardHeader className="p-4 pb-3">
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={manualPlateText}
-                      onChange={(e) => setManualPlateText(e.target.value)}
-                      className="w-full text-center font-mono text-xl font-black bg-slate-900 border border-cyan-500 text-white rounded-lg p-1.5 focus:outline-none"
-                    />
-                    <button
-                      onClick={handleSaveManualPlate}
-                      className="px-3 py-1.5 rounded-lg bg-cyan-600 text-white text-xs font-bold cursor-pointer"
-                    >
-                      Simpan
-                    </button>
+                    <FileCheck className="w-4 h-4 text-muted-foreground" />
+                    <CardTitle className="text-xs font-semibold">
+                      Kendaraan Aktif: <span className="font-mono">#{selectedVehicleIndex + 1}</span>
+                    </CardTitle>
                   </div>
-                ) : (
-                  <div>
-                    <div className="flex items-center justify-center gap-2">
-                      <div className="font-mono text-2xl sm:text-3xl font-black tracking-wider text-white select-all">
-                        {activeResult.formattedPlate}
-                      </div>
-                      <button
-                        onClick={() => {
-                          setManualPlateText(activeResult.formattedPlate);
-                          setIsEditingPlate(true);
-                        }}
-                        className="p-1 rounded text-slate-500 hover:text-cyan-400 transition cursor-pointer"
-                        title="Koreksi Nomor Plat Manual"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                      </button>
+                  <Badge variant="success" className="font-mono text-[10px]">
+                    {activeResult.confidence}% Akurasi
+                  </Badge>
+                </div>
+              </CardHeader>
+
+              <CardContent className="p-4 pt-0 space-y-3">
+                {/* Plate display */}
+                <div className="rounded-lg border border-border bg-muted/40 p-3.5 text-center">
+                  {isEditingPlate ? (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="text"
+                        value={manualPlateText}
+                        onChange={(e) => setManualPlateText(e.target.value)}
+                        className="text-center font-mono text-lg font-bold"
+                      />
+                      <Button size="sm" onClick={handleSaveManualPlate} className="text-xs">
+                        Simpan
+                      </Button>
                     </div>
-                    {activeResult.expiryDate && (
-                      <div className="mt-1 text-[11px] font-mono font-semibold text-slate-400 tracking-widest">
-                        MASA BERLAKU: {activeResult.expiryDate}
+                  ) : (
+                    <div>
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="font-mono text-2xl font-black tracking-wider text-foreground select-all">
+                          {activeResult.formattedPlate}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="iconSm"
+                          onClick={() => handleCopyPlate(activeResult.formattedPlate)}
+                          title="Salin Nomor Plat"
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                        >
+                          {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="iconSm"
+                          onClick={() => {
+                            setManualPlateText(activeResult.formattedPlate);
+                            setIsEditingPlate(true);
+                          }}
+                          title="Koreksi Nomor Plat"
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </Button>
                       </div>
-                    )}
-                  </div>
-                )}
-              </div>
+                      {activeResult.expiryDate && (
+                        <div className="mt-1 text-[11px] font-mono text-muted-foreground">
+                          MASA BERLAKU: {activeResult.expiryDate}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
 
-              {/* Status Badge */}
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">Hak Akses Gerbang:</span>
-                <span
-                  className={`px-2.5 py-0.5 rounded-full font-bold uppercase text-[11px] ${
-                    activeResult.status === 'vip'
-                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                {/* Gate Access Badge */}
+                <div className="flex items-center justify-between text-xs pt-1">
+                  <span className="text-muted-foreground">Hak Akses:</span>
+                  <Badge
+                    variant={
+                      activeResult.status === 'vip'
+                        ? 'vip'
+                        : activeResult.status === 'registered'
+                        ? 'success'
+                        : activeResult.status === 'blacklist'
+                        ? 'destructive'
+                        : 'secondary'
+                    }
+                    className="uppercase text-[10px]"
+                  >
+                    {activeResult.status === 'vip'
+                      ? 'VIP ACCESS'
                       : activeResult.status === 'registered'
-                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                      ? 'TERDAFTAR'
                       : activeResult.status === 'blacklist'
-                      ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                      : 'bg-slate-800 text-slate-300 border border-slate-700'
-                  }`}
-                >
-                  {activeResult.status === 'vip'
-                    ? 'VIP ACCESS'
-                    : activeResult.status === 'registered'
-                    ? 'TERDAFTAR'
-                    : activeResult.status === 'blacklist'
-                    ? 'BLACKLIST'
-                    : 'TAMU / UMUM'}
-                </span>
-              </div>
-
-              {/* Crop & Binarized Preview */}
-              <div className="grid grid-cols-2 gap-2 pt-1">
-                <div className="p-1.5 rounded-lg bg-slate-950 border border-slate-800 flex flex-col items-center">
-                  <span className="text-[9px] text-slate-500 mb-1">Crop Potongan Plat</span>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={activeResult.plateCropImage}
-                    alt="Crop"
-                    className="max-h-12 w-auto object-contain rounded"
-                  />
+                      ? 'BLACKLIST'
+                      : 'TAMU / UMUM'}
+                  </Badge>
                 </div>
-                <div className="p-1.5 rounded-lg bg-slate-950 border border-slate-800 flex flex-col items-center">
-                  <span className="text-[9px] text-slate-500 mb-1">Enhanced OCR</span>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={activeResult.enhancedPlateImage || activeResult.plateCropImage}
-                    alt="Enhanced"
-                    className="max-h-12 w-auto object-contain rounded bg-white"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
 
-          {/* 1-Click Preset Samples for Instant Testing */}
-          <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 shadow-xl">
-            <div className="flex items-center justify-between mb-2.5">
-              <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-cyan-400" /> Contoh Armada Bawaan (1-Click Test):
-              </span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {DEMO_SAMPLES.map((sample) => (
-                <button
-                  key={sample.id}
-                  onClick={() => handleSelectSample(sample)}
-                  className="flex flex-col items-start p-2.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-cyan-500/50 hover:bg-slate-900 transition text-left group cursor-pointer"
-                >
-                  <div className="flex items-center justify-between w-full">
-                    <span className="font-mono text-xs font-black text-cyan-400 group-hover:text-cyan-300">
-                      {sample.plate}
-                    </span>
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 uppercase">
-                      {sample.vehicle}
-                    </span>
+                {/* Plate Crop Preview */}
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div className="p-2 rounded-md bg-muted/40 border border-border flex flex-col items-center">
+                    <span className="text-[10px] text-muted-foreground mb-1">Crop Plat</span>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={activeResult.plateCropImage}
+                      alt="Crop"
+                      className="max-h-10 w-auto object-contain rounded"
+                    />
                   </div>
-                  <span className="text-[11px] text-slate-300 truncate w-full mt-1 font-medium">
-                    {sample.name}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
+                  <div className="p-2 rounded-md bg-muted/40 border border-border flex flex-col items-center">
+                    <span className="text-[10px] text-muted-foreground mb-1">Binarized OCR</span>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={activeResult.enhancedPlateImage || activeResult.plateCropImage}
+                      alt="Enhanced"
+                      className="max-h-10 w-auto object-contain rounded bg-white"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
-        {/* Right Column: Cargo Manifest Form for Active Vehicle */}
+        {/* Right Column: Cargo Manifest Form */}
         <div className="lg:col-span-7 flex flex-col gap-4">
-          <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5 shadow-xl">
-            {activeResult ? (
-              <VehicleCargoForm
-                key={activeResult.id || `${activeResult.formattedPlate}_${selectedVehicleIndex}`}
-                plateNumber={activeResult.formattedPlate}
-                initialManifest={activeResult.cargoManifest}
-                onSaveManifest={handleSaveManifest}
-                onOpenGatePassSlip={() => onOpenGatePassSlip(activeResult)}
-              />
-            ) : (
-              <div className="py-16 text-center text-slate-500 space-y-3">
-                <div className="w-16 h-16 rounded-2xl bg-slate-800/60 border border-slate-700 flex items-center justify-center mx-auto text-slate-400">
-                  <Package className="w-8 h-8 text-cyan-400" />
+          {activeResult ? (
+            <VehicleCargoForm
+              key={activeResult.id || `${activeResult.formattedPlate}_${selectedVehicleIndex}`}
+              plateNumber={activeResult.formattedPlate}
+              initialManifest={activeResult.cargoManifest}
+              onSaveManifest={handleSaveManifest}
+              onOpenGatePassSlip={() => onOpenGatePassSlip(activeResult)}
+            />
+          ) : (
+            <Card className="min-h-[420px] flex items-center justify-center text-center p-8">
+              <div className="space-y-3 max-w-sm">
+                <div className="w-12 h-12 rounded-lg bg-muted border border-border flex items-center justify-center mx-auto text-muted-foreground">
+                  <FileCheck className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-300">
-                    Formulir Muatan & Barang Bawaan Siap
+                  <h3 className="text-sm font-semibold text-foreground">
+                    Formulir Manifes Siap
                   </h3>
-                  <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1">
-                    Upload foto kendaraan (termasuk foto dengan banyak motor/mobil) untuk memindai seluruh plat dan mengisi data muatan masing-masing.
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Pilih atau upload gambar kendaraan di sebelah kiri untuk mengisi data muatan, sopir, dan mencetak izin gerbang.
                   </p>
                 </div>
               </div>
-            )}
-          </div>
+            </Card>
+          )}
         </div>
       </div>
     </div>

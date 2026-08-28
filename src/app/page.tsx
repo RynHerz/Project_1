@@ -53,7 +53,6 @@ export default function Home() {
       if (savedHistory) {
         setHistory(JSON.parse(savedHistory));
       } else {
-        // Seed with initial realistic demo history so the user sees a rich initial dashboard
         const initialSeedHistory: DetectionResult[] = DEMO_SAMPLES.slice(0, 3).map((sample, idx) => ({
           id: `seed-${sample.id}`,
           timestamp: Date.now() - (idx + 1) * 1800000,
@@ -93,7 +92,7 @@ export default function Home() {
   const saveHistory = (newHistory: DetectionResult[]) => {
     setHistory(newHistory);
     try {
-      localStorage.setItem('alpr_history', JSON.stringify(newHistory.slice(0, 100))); // Keep last 100
+      localStorage.setItem('alpr_history', JSON.stringify(newHistory.slice(0, 100)));
     } catch (e) {}
   };
 
@@ -120,7 +119,6 @@ export default function Home() {
 
     saveHistory(updated);
 
-    // Trigger celebratory confetti if VIP plate detected
     if (result.status === 'vip' && existingIndex < 0) {
       try {
         confetti({
@@ -132,19 +130,16 @@ export default function Home() {
     }
   };
 
-  // Add rule from Access Manager or Detail Modal
   const handleAddRule = (rule: WhitelistRule) => {
     const updated = [rule, ...whitelistRules.filter((r) => r.plateNumber !== rule.plateNumber)];
     saveWhitelistRules(updated);
   };
 
-  // Delete rule
   const handleDeleteRule = (plateNumber: string) => {
     const updated = whitelistRules.filter((r) => r.plateNumber !== plateNumber);
     saveWhitelistRules(updated);
   };
 
-  // Update status from detail modal
   const handleUpdateStatusFromDetail = (
     plateNumber: string,
     status: WhitelistRule['status'],
@@ -162,7 +157,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-cyan-500 selection:text-white">
+    <div className="min-h-screen bg-background text-foreground flex flex-col font-sans">
       {/* Top Navbar */}
       <Navbar
         activeTab={activeTab}
@@ -218,11 +213,11 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="w-full border-t border-slate-900 bg-slate-950/80 py-4 px-6 text-center text-xs text-slate-500">
+      <footer className="w-full border-t border-border bg-card/60 py-4 px-6 text-center text-xs text-muted-foreground">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>ALPR Cargo AI • Sistem Deteksi Plat Nomor & Manifes Muatan Logistik</span>
-          <span className="font-mono text-[11px] text-cyan-400">
-            Client-Side AI Inference • Modern Logistics Checkpoint
+          <span className="font-mono text-[11px] text-muted-foreground">
+            Client-Side AI Inference • High Efficiency Logistics Checkpoint
           </span>
         </div>
       </footer>
